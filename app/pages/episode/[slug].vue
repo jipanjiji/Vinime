@@ -160,19 +160,13 @@ async function loadEpisodeData() {
       // 2. If hash available, call animeku.org API directly from browser (user's home IP — NOT blocked)
       if (hashData.hash) {
         try {
-          const apiRes = await fetch('https://animeku.org/api/v9/sources', {
+          const proxyRes = await $fetch('/api/animeku-proxy', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Referer': hashData.kuronimeUrl,
-              'Origin': 'https://kuronime.sbs'
-            },
-            body: JSON.stringify({ id: hashData.hash })
-          })
+            body: { id: hashData.hash, referer: hashData.kuronimeUrl }
+          }).catch(() => null)
 
-          if (apiRes.ok) {
-            const json = await apiRes.json()
-            if (json.status === 200 && json.mirror) {
+          if (proxyRes?.success && proxyRes.data?.status === 200 && proxyRes.data?.mirror) {
+            const json = proxyRes.data
               const { default: CryptoJS } = await import('crypto-js')
 
               const CryptoJSAesJson = {
