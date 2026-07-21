@@ -22,7 +22,17 @@ export default defineEventHandler(async (event) => {
     
     try {
       const epHtml = await $fetch<string>(kuronimeUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124"',
+          'Sec-Ch-Ua-Mobile': '?0',
+          'Sec-Ch-Ua-Platform': '"Windows"',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none'
+        }
       })
       const $ep = cheerio.load(epHtml)
 
@@ -63,9 +73,10 @@ export default defineEventHandler(async (event) => {
           {
             method: 'POST',
             headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
               'Content-Type': 'application/json',
-              'Referer': kuronimeUrl
+              'Referer': kuronimeUrl,
+              'Origin': 'https://kuronime.sbs'
             },
             body: { id: hashVal }
           }
@@ -212,7 +223,7 @@ export default defineEventHandler(async (event) => {
 
           for (const q of uniqueQueries) {
             try {
-              const searchUrl = `https://v2.samehadaku.how/?s=${encodeURIComponent(q)}`
+              const searchUrl = `https://samehadaku.email/?s=${encodeURIComponent(q)}`
               console.log(`[Episode Engine] Searching Samehadaku fallback: ${searchUrl}`)
 
               const searchHtml = await fetchHttp2(searchUrl)
