@@ -345,9 +345,30 @@ async function playResolution(quality, hostIndex = 0) {
     const rawUrl = resolveData.rawVideoUrl
     const isCapacitor = typeof window !== 'undefined' && (
       window.location.protocol === 'capacitor:' ||
-      window.location.hostname === 'localhost' ||
+      (window.location.hostname === 'localhost' && !window.location.port) ||
       window.location.hostname === '127.0.0.1'
     )
+
+    // In Android APK, fetch Pixeldrain via native Capacitor fetch to bypass Webview Origin 403
+    if (isCapacitor && rawUrl.includes('pixeldrain.com')) {
+      try {
+        const res = await fetch(rawUrl).catch(() => null)
+        if (res?.ok) {
+          const blob = await res.blob()
+          const blobUrl = URL.createObjectURL(blob)
+          selectedVideo.value = {
+            title: src.label,
+            quality,
+            playUrl: blobUrl,
+            isHls: false
+          }
+          isResolving.value = false
+          return
+        }
+      } catch (e) {
+        console.warn('[APK Player] Blob fetch fallback:', e)
+      }
+    }
 
     const isDirectPlay = isCapacitor ||
       rawUrl.includes('wibufile.com') || rawUrl.includes('archive.org') ||
