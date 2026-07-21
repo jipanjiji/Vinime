@@ -176,7 +176,7 @@ async function loadEpisodeData() {
               const { default: CryptoJS } = await import('crypto-js')
 
               const CryptoJSAesJson = {
-                parse(jsonStr: string) {
+                parse: function(jsonStr) {
                   const j = JSON.parse(jsonStr)
                   const cp = CryptoJS.lib.CipherParams.create({ ciphertext: CryptoJS.enc.Base64.parse(j.ct) })
                   if (j.iv) cp.iv = CryptoJS.enc.Hex.parse(j.iv)
