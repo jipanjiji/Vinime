@@ -350,7 +350,7 @@ async function playResolution(quality, hostIndex = 0) {
 
     const playUrl = isDirectPlay
       ? rawUrl
-      : `/api/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent(src.url || 'https://pixeldrain.com/')}`
+      : `/api/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent(rawUrl.includes('pixeldrain.com') ? 'https://pixeldrain.com/' : (src.url || ''))}`
 
     selectedVideo.value = {
       title: src.label,
