@@ -14,16 +14,19 @@ export default defineEventHandler(async (event) => {
 
   const lowerUrl = embedUrl.toLowerCase()
 
-  // 1. Pixeldrain Direct Stream Bypass
-  if (lowerUrl.includes('pixeldrain.com/u/')) {
+  // 1. Pixeldrain Direct Stream Bypass (support both /u/ and /api/file/ formats)
+  if (lowerUrl.includes('pixeldrain.com')) {
     try {
-      const parts = embedUrl.split('/u/')
-      const id = parts[1]?.split('?')[0]?.replace(/\/$/, '')
+      let id = ''
+      if (lowerUrl.includes('/u/')) {
+        id = embedUrl.split('/u/')[1]?.split('?')[0]?.replace(/\/$/, '')
+      } else if (lowerUrl.includes('/api/file/')) {
+        id = embedUrl.split('/api/file/')[1]?.split('?')[0]?.replace(/\/$/, '')
+      }
       if (id) {
-        const directUrl = `https://pixeldrain.com/api/file/${id}`
         return {
           success: true,
-          rawVideoUrl: directUrl,
+          rawVideoUrl: `https://pixeldrain.com/api/file/${id}`,
           type: 'video/mp4',
           embedUrl
         }
@@ -31,8 +34,21 @@ export default defineEventHandler(async (event) => {
     } catch {}
   }
 
-  // 2. Direct Stream Check (already mp4 or m3u8)
-  if (lowerUrl.includes('.mp4') || lowerUrl.includes('.m3u8')) {
+  // 2. Direct Stream Check (already mp4, m3u8, mkv, webm, or direct storage hosts)
+  if (
+    lowerUrl.includes('.mp4') ||
+    lowerUrl.includes('.m3u8') ||
+    lowerUrl.includes('.mkv') ||
+    lowerUrl.includes('.webm') ||
+    lowerUrl.includes('googlevideo.com') ||
+    lowerUrl.includes('blogger.com') ||
+    lowerUrl.includes('blogspot.com') ||
+    lowerUrl.includes('googleusercontent.com') ||
+    lowerUrl.includes('wibufile.com') ||
+    lowerUrl.includes('filedon.co') ||
+    lowerUrl.includes('cloudflarestorage.com') ||
+    lowerUrl.includes('archive.org')
+  ) {
     return {
       success: true,
       rawVideoUrl: embedUrl,
