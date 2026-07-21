@@ -186,7 +186,7 @@ async function loadEpisodeData() {
               }
 
               const decryptedBase64 = atob(json.mirror)
-              const decryptedBytes = CryptoJS.AES.decrypt(decryptedBase64, '3&!Z0M,VIZ;dZW==', { format: CryptoJSAesJson as any })
+              const decryptedBytes = CryptoJS.AES.decrypt(decryptedBase64, '3&!Z0M,VIZ;dZW==', { format: CryptoJSAesJson })
               const decryptedData = JSON.parse(decryptedBytes.toString(CryptoJS.enc.Utf8))
 
               // Add embed sources
