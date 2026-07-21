@@ -28,9 +28,96 @@ async function handleScrape() {
   destroyHls()
 
   try {
-    const data = await $fetch(`/api/scrape/kuronime?url=${encodeURIComponent(targetUrl.value)}`)
-    if (data.success) {
-      sources.value = data.videoSources
+    const data = await $fetch(`/api/scrape/kuronime?url=${encodeURIComponent(targetUrl.value)}`).catch(() => ({ success: false, videoSources: [], message: 'Server blocked' }))
+    let allSources = [...(data.videoSources || [])]
+
+    try {
+      let slug = ''
+      try {
+        const urlObj = new URL(targetUrl.value)
+        slug = urlObj.pathname.split('/').filter(Boolean).pop() || ''
+      } catch {
+        slug = targetUrl.value.split('/').filter(Boolean).pop() || ''
+      }
+
+      if (slug) {
+        const hashData = await $fetch(`/api/kuronime-hash?slug=${encodeURIComponent(slug)}`).catch(() => null)
+        if (hashData?.success) {
+          for (const d of (hashData.directLinks || [])) {
+            if (!allSources.some(s => s.url === d.url)) {
+              allSources.push({
+                label: `[Kuronime Direct] ${d.mirror} (${d.quality})`,
+                url: d.url,
+                quality: d.quality
+              })
+            }
+          }
+
+          if (hashData.hash) {
+            const apiRes = await fetch('https://animeku.org/api/v9/sources', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Referer': hashData.kuronimeUrl,
+                'Origin': 'https://kuronime.sbs'
+              },
+              body: JSON.stringify({ id: hashData.hash })
+            })
+
+            if (apiRes.ok) {
+              const json = await apiRes.json()
+              if (json && json.status === 200 && json.mirror) {
+                const { default: CryptoJS } = await import('crypto-js')
+                const CryptoJSAesJson = {
+                  parse: function(jsonStr) {
+                    const j = JSON.parse(jsonStr)
+                    const cp = CryptoJS.lib.CipherParams.create({ ciphertext: CryptoJS.enc.Base64.parse(j.ct) })
+                    if (j.iv) cp.iv = CryptoJS.enc.Hex.parse(j.iv)
+                    if (j.s) cp.salt = CryptoJS.enc.Hex.parse(j.s)
+                    return cp
+                  }
+                }
+
+                const decryptedBase64 = atob(json.mirror)
+                const decryptedBytes = CryptoJS.AES.decrypt(decryptedBase64, '3&!Z0M,VIZ;dZW==', { format: CryptoJSAesJson })
+                const decryptedData = JSON.parse(decryptedBytes.toString(CryptoJS.enc.Utf8))
+
+                const embed = decryptedData.embed || {}
+                for (const quality in embed) {
+                  const servers = embed[quality]
+                  const cleanQ = quality.replace(/^v/, '')
+                  for (const serverName in servers) {
+                    const url = servers[serverName]
+                    if (url && !allSources.some(s => s.url === url)) {
+                      allSources.push({ label: `[Kuronime] ${serverName} (${cleanQ})`, url, quality: cleanQ })
+                    }
+                  }
+                }
+
+                const download = decryptedData.download || {}
+                for (const quality in download) {
+                  const mirrors = download[quality]
+                  const cleanQ = quality.replace(/^v/, '')
+                  for (const mirrorName in mirrors) {
+                    const url = mirrors[mirrorName]
+                    if (url && (url.includes('pixeldrain.com') || url.includes('krakenfiles.com') || url.includes('gofile.io') || url.includes('acefile.co'))) {
+                      if (!allSources.some(s => s.url === url)) {
+                        allSources.push({ label: `[Kuronime Direct] ${mirrorName} (${cleanQ})`, url, quality: cleanQ })
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (clientErr) {
+      console.warn('Client fallback failed:', clientErr)
+    }
+
+    if (allSources.length > 0) {
+      sources.value = allSources
     } else {
       errorMsg.value = data.message || 'Gagal melakukan scraping.'
     }

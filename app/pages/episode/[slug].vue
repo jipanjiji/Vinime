@@ -335,6 +335,13 @@ async function playResolution(quality, hostIndex = 0) {
             const isFinished = prog.duration > 0 && (prog.lastTime / prog.duration >= 0.95 || (prog.duration - prog.lastTime) < 15)
             if (!isFinished) {
               targetTime = prog.lastTime
+            } else {
+              saveEpisodeProgress(
+                parentAnime.value,
+                { slug: epSlug.value, episodeNumber: currentEpisodeNumber.value },
+                0,
+                prog.duration
+              )
             }
           }
         }
