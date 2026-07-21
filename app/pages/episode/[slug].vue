@@ -300,9 +300,24 @@ async function playResolution(quality, hostIndex = 0) {
   selectedVideo.value = null
   showQualityMenu.value = false
 
+import { fetchClientEpisode, resolveClientVideoUrl } from '~/utils/clientScraper'
+
   try {
-    const resolveData = await $fetch(`/api/resolve?url=${encodeURIComponent(src.url)}`)
-    if (!resolveData.success) {
+    let resolveData = await $fetch(`/api/resolve?url=${encodeURIComponent(src.url)}`).catch(() => null)
+
+    if (!resolveData?.success) {
+      const clientResolved = await resolveClientVideoUrl(src.url)
+      if (clientResolved?.rawVideoUrl) {
+        resolveData = {
+          success: true,
+          rawVideoUrl: clientResolved.rawVideoUrl,
+          isIframe: clientResolved.isIframe,
+          isHls: clientResolved.isHls
+        }
+      }
+    }
+
+    if (!resolveData?.success) {
       playResolution(quality, hostIndex + 1)
       return
     }
@@ -311,12 +326,20 @@ async function playResolution(quality, hostIndex = 0) {
     const isDirectPlay = rawUrl.includes('wibufile.com') || rawUrl.includes('archive.org') ||
       rawUrl.includes('cloudflarestorage.com') || rawUrl.includes('filedon.co') ||
       rawUrl.includes('googlevideo.com') || rawUrl.includes('blogger.com') ||
-      rawUrl.includes('blogspot.com') || rawUrl.includes('googleusercontent.com')
+      rawUrl.includes('blogspot.com') || rawUrl.includes('googleusercontent.com') ||
+      rawUrl.includes('pixeldrain.com') || rawUrl.includes('krakenfiles.com') || Boolean(resolveData.isIframe)
+
     const playUrl = isDirectPlay
       ? rawUrl
       : `/api/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent(src.url)}`
 
-    selectedVideo.value = { title: src.label, quality, playUrl, isHls: rawUrl.includes('m3u8') }
+    selectedVideo.value = {
+      title: src.label,
+      quality,
+      playUrl,
+      isHls: rawUrl.includes('m3u8') || Boolean(resolveData.isHls),
+      isIframe: Boolean(resolveData.isIframe)
+    }
     isResolving.value = false
 
     nextTick(() => {
@@ -608,8 +631,18 @@ function handleKeyDown(e) {
           <button @click="loadEpisodeData" class="mt-1 px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-xs font-bold text-white rounded-xl transition-colors">Coba Lagi</button>
         </div>
 
-        <!-- Video element -->
+        <!-- Iframe Embed Video Player (for Otakudesu / Embed sources) -->
+        <iframe
+          v-if="selectedVideo && selectedVideo.isIframe"
+          :src="selectedVideo.playUrl"
+          class="w-full h-full border-0 z-10 relative"
+          allowfullscreen
+          allow="autoplay; encrypted-media; picture-in-picture"
+        ></iframe>
+
+        <!-- Native HTML5 Video Element (for Pixeldrain / Krakenfiles / MP4 / HLS streams) -->
         <video
+          v-else
           id="vnime-player"
           playsinline
           class="w-full h-full object-contain"

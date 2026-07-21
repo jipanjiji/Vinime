@@ -6,6 +6,57 @@ const CHROME_HEADERS = {
   'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8'
 }
 
+export async function resolveClientVideoUrl(url: string) {
+  if (!url) return null
+
+  // 1. Pixeldrain direct API link
+  if (url.includes('pixeldrain.com')) {
+    const match = url.match(/pixeldrain\.com\/(?:u|file|api\/file)\/([a-zA-Z0-9]+)/)
+    if (match) {
+      const fileId = match[1]
+      return {
+        rawVideoUrl: `https://pixeldrain.com/api/file/${fileId}?download`,
+        isIframe: false,
+        isHls: false
+      }
+    }
+  }
+
+  // 2. Direct MP4 / HLS streams
+  if (url.endsWith('.mp4') || url.includes('.m3u8') || url.includes('wibufile.com') || url.includes('googlevideo.com') || url.includes('blogspot.com') || url.includes('filedon.co')) {
+    return {
+      rawVideoUrl: url,
+      isIframe: false,
+      isHls: url.includes('.m3u8')
+    }
+  }
+
+  // 3. Krakenfiles direct resolver
+  if (url.includes('krakenfiles.com')) {
+    try {
+      const res = await fetch(url, { headers: CHROME_HEADERS })
+      if (res.ok) {
+        const html = await res.text()
+        const $ = cheerio.load(html)
+        const videoSrc = $('video source').attr('src') || $('video#my-video source').attr('src') || $('a[href*="/download/"]').attr('href')
+        if (videoSrc) {
+          const directUrl = videoSrc.startsWith('http') ? videoSrc : `https:${videoSrc}`
+          return { rawVideoUrl: directUrl, isIframe: false, isHls: false }
+        }
+      }
+    } catch {}
+  }
+
+  // 4. Default / Iframes (Otakudesu, Desustream, Streamhide, etc.)
+  const isIframe = url.includes('otakudesu.') || url.includes('desudrive.') || url.includes('desustream.') || url.includes('/embed/') || url.includes('iframe') || !url.endsWith('.mp4')
+
+  return {
+    rawVideoUrl: url,
+    isIframe,
+    isHls: url.includes('.m3u8')
+  }
+}
+
 export async function fetchClientHomeFeed() {
   try {
     const res = await fetch('https://kuronime.sbs/', { headers: CHROME_HEADERS })
