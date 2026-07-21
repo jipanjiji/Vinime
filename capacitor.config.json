@@ -1,0 +1,12 @@
+{
+  "appId": "com.vinime.app",
+  "appName": "Vinime",
+  "webDir": ".output/public",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Vinime</string>
+    <string name="title_activity_main">Vinime</string>
+    <string name="package_name">com.vinime.app</string>
+    <string name="custom_url_scheme">com.vinime.app</string>
+</resources>
