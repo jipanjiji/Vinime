@@ -367,10 +367,23 @@ export default defineEventHandler(async (event) => {
 
           for (const q of uniqueQueries) {
             try {
-              const searchUrl = `https://otakudesu.blog/?s=${encodeURIComponent(q)}&post_type=anime`
-              const html = await $fetch<string>(searchUrl, {
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
-              })
+              const otakuDesuDomains = ['otakudesu.cloud', 'otakudesu.blog', 'otakudesu.lol']
+              let html = ''
+              let activeOtakuDomain = 'otakudesu.cloud'
+              const odHeaders = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8'
+              }
+              for (const od of otakuDesuDomains) {
+                try {
+                  html = await $fetch<string>(`https://${od}/?s=${encodeURIComponent(q)}&post_type=anime`, { headers: odHeaders, timeout: 5000 })
+                  activeOtakuDomain = od
+                  break
+                } catch { /* try next domain */ }
+              }
+              if (!html) continue
+
               const $ = cheerio.load(html)
               
               let matchedAnimeLink = ''
@@ -388,9 +401,8 @@ export default defineEventHandler(async (event) => {
 
               if (matchedAnimeLink) {
                 console.log(`[Episode Engine] Matched Otakudesu Detail: ${matchedAnimeLink}`)
-                const animeHtml = await $fetch<string>(matchedAnimeLink, {
-                  headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
-                })
+                const fixedAnimeLink = matchedAnimeLink.replace(/otakudesu\.(?:blog|lol|org)/i, activeOtakuDomain)
+                const animeHtml = await $fetch<string>(fixedAnimeLink, { headers: odHeaders })
                 const $anime = cheerio.load(animeHtml)
 
                 $anime('.episodelist ul li').each((_, el) => {
@@ -411,9 +423,15 @@ export default defineEventHandler(async (event) => {
 
           if (otakudesuEpisodeUrl) {
             console.log(`[Episode Engine] Matched Otakudesu Episode Player: ${otakudesuEpisodeUrl}`)
-            const epHtml = await $fetch<string>(otakudesuEpisodeUrl, {
-              headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
-            })
+            const odEpHeaders = {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8',
+              'Sec-Fetch-Dest': 'document',
+              'Sec-Fetch-Mode': 'navigate',
+              'Sec-Fetch-Site': 'none'
+            }
+            const epHtml = await $fetch<string>(otakudesuEpisodeUrl, { headers: odEpHeaders })
             const $ep = cheerio.load(epHtml)
 
             let scriptWithNonce = ''

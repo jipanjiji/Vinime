@@ -27,7 +27,28 @@ export default defineEventHandler(async (event) => {
 
   try {
     const videoSources: Array<{ label: string; url: string; quality: string }> = []
-    const epHtml = await $fetch<string>(targetUrl, { headers: CHROME_HEADERS })
+
+    let epHtml = ''
+    let activeUrl = targetUrl
+    const domains = ['otakudesu.cloud', 'otakudesu.blog', 'otakudesu.lol']
+
+    for (const d of domains) {
+      try {
+        const urlObj = new URL(activeUrl)
+        urlObj.hostname = d
+        console.log(`[Otakudesu Scraper] Fetching: ${urlObj.toString()}`)
+        epHtml = await $fetch<string>(urlObj.toString(), { headers: CHROME_HEADERS, timeout: 6000 })
+        activeUrl = urlObj.toString()
+        break
+      } catch (err: any) {
+        console.warn(`[Otakudesu Scraper] Domain ${d} failed: ${err.message}`)
+      }
+    }
+
+    if (!epHtml) {
+      throw new Error('All Otakudesu domains blocked or offline.')
+    }
+
     const $ep = cheerio.load(epHtml)
 
     // Extract embed options
@@ -43,7 +64,7 @@ export default defineEventHandler(async (event) => {
         const streamAction = actionMatches[0][1]
         const getNonceAction = actionMatches[1][1]
 
-        const parsedOrigin = new URL(targetUrl).origin
+        const parsedOrigin = new URL(activeUrl).origin
         const ajaxUrl = `${parsedOrigin}/wp-admin/admin-ajax.php`
 
         const nonceBody = new URLSearchParams()
@@ -53,7 +74,7 @@ export default defineEventHandler(async (event) => {
           method: 'POST',
           headers: {
             ...CHROME_HEADERS,
-            'Referer': targetUrl,
+            'Referer': activeUrl,
             'Content-Type': 'application/x-www-form-urlencoded',
             'X-Requested-With': 'XMLHttpRequest',
             'Sec-Fetch-Dest': 'empty',
