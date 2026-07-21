@@ -107,7 +107,6 @@ async function handleScrape() {
             }
           }
         }
-      }
     } catch (clientErr) {
       console.warn('Client fallback failed:', clientErr)
     }
