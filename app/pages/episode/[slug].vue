@@ -3,6 +3,7 @@ import { ref, watch, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
 import { useRoute, useRouter } from '#app'
 import Hls from 'hls.js'
 import { saveEpisodeProgress, getEpisodeProgress } from '~/utils/storage'
+import { fetchClientEpisode, resolveClientVideoUrl } from '~/utils/clientScraper'
 
 const route = useRoute()
 const router = useRouter()
@@ -299,8 +300,6 @@ async function playResolution(quality, hostIndex = 0) {
   destroyHls()
   selectedVideo.value = null
   showQualityMenu.value = false
-
-import { fetchClientEpisode, resolveClientVideoUrl } from '~/utils/clientScraper'
 
   try {
     let resolveData = await $fetch(`/api/resolve?url=${encodeURIComponent(src.url)}`).catch(() => null)
