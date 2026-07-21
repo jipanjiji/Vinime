@@ -14,12 +14,22 @@ onMounted(async () => {
   await fetchHomeFeed()
 })
 
+import { fetchClientHomeFeed } from '~/utils/clientScraper'
+
 async function fetchHomeFeed() {
   try {
-    const data = await $fetch('/api/home')
-    if (data.success) {
+    const data = await $fetch('/api/home').catch(() => null)
+    if (data?.success && data.recentReleases?.length > 0) {
       recentReleases.value = data.recentReleases
       popularAnime.value = data.popularAnime
+      return
+    }
+
+    // Client-side fallback for Capacitor APK directly using phone network
+    const clientData = await fetchClientHomeFeed()
+    if (clientData?.success) {
+      recentReleases.value = clientData.recentReleases
+      popularAnime.value = clientData.popularAnime
     }
   } catch (err) {
     console.error('Failed to load home feed:', err)
