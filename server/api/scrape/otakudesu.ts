@@ -61,11 +61,15 @@ export default defineEventHandler(async (event) => {
     if (scriptWithNonce) {
       const actionMatches = [...scriptWithNonce.matchAll(/action\s*:\s*["']([a-f0-9]{32})["']/g)]
       if (actionMatches.length >= 2) {
+        // actionMatches[0] = streamAction, actionMatches[1] = getNonceAction
         const streamAction = actionMatches[0][1]
         const getNonceAction = actionMatches[1][1]
 
-        const parsedOrigin = new URL(activeUrl).origin
-        const ajaxUrl = `${parsedOrigin}/wp-admin/admin-ajax.php`
+        // Extract the AJAX URL directly from the script (the script hardcodes otakudesu.blog)
+        const ajaxUrlMatch = scriptWithNonce.match(/\$\.ajax\(["'](https?:\/\/[^"']+admin-ajax\.php)["']/) ||
+          scriptWithNonce.match(/["'](https?:\/\/[^"']+admin-ajax\.php)["']/)
+        const ajaxUrl = ajaxUrlMatch ? ajaxUrlMatch[1] : `${new URL(activeUrl).origin}/wp-admin/admin-ajax.php`
+        console.log(`[Otakudesu Scraper] AJAX URL: ${ajaxUrl}, streamAction: ${streamAction}, getNonceAction: ${getNonceAction}`)
 
         const nonceBody = new URLSearchParams()
         nonceBody.append('action', getNonceAction)
@@ -114,7 +118,7 @@ export default defineEventHandler(async (event) => {
                   method: 'POST',
                   headers: {
                     ...CHROME_HEADERS,
-                    'Referer': targetUrl,
+                    'Referer': activeUrl,
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'X-Requested-With': 'XMLHttpRequest',
                     'Sec-Fetch-Dest': 'empty',
