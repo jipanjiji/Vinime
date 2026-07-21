@@ -211,7 +211,6 @@ async function loadEpisodeData() {
                 }
               }
             }
-          }
         } catch (animekuErr) {
           console.warn('[Client] animeku.org call failed:', animekuErr)
         }
