@@ -310,13 +310,12 @@ async function playResolution(quality, hostIndex = 0) {
         resolveData = {
           success: true,
           rawVideoUrl: clientResolved.rawVideoUrl,
-          isIframe: clientResolved.isIframe,
           isHls: clientResolved.isHls
         }
       }
     }
 
-    if (!resolveData?.success) {
+    if (!resolveData?.success || !resolveData.rawVideoUrl) {
       playResolution(quality, hostIndex + 1)
       return
     }
@@ -326,7 +325,7 @@ async function playResolution(quality, hostIndex = 0) {
       rawUrl.includes('cloudflarestorage.com') || rawUrl.includes('filedon.co') ||
       rawUrl.includes('googlevideo.com') || rawUrl.includes('blogger.com') ||
       rawUrl.includes('blogspot.com') || rawUrl.includes('googleusercontent.com') ||
-      rawUrl.includes('pixeldrain.com') || rawUrl.includes('krakenfiles.com') || Boolean(resolveData.isIframe)
+      rawUrl.includes('pixeldrain.com') || rawUrl.includes('krakenfiles.com')
 
     const playUrl = isDirectPlay
       ? rawUrl
@@ -336,8 +335,7 @@ async function playResolution(quality, hostIndex = 0) {
       title: src.label,
       quality,
       playUrl,
-      isHls: rawUrl.includes('m3u8') || Boolean(resolveData.isHls),
-      isIframe: Boolean(resolveData.isIframe)
+      isHls: rawUrl.includes('m3u8') || Boolean(resolveData.isHls)
     }
     isResolving.value = false
 
@@ -630,18 +628,8 @@ function handleKeyDown(e) {
           <button @click="loadEpisodeData" class="mt-1 px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-xs font-bold text-white rounded-xl transition-colors">Coba Lagi</button>
         </div>
 
-        <!-- Iframe Embed Video Player (for Otakudesu / Embed sources) -->
-        <iframe
-          v-if="selectedVideo && selectedVideo.isIframe"
-          :src="selectedVideo.playUrl"
-          class="w-full h-full border-0 z-10 relative"
-          allowfullscreen
-          allow="autoplay; encrypted-media; picture-in-picture"
-        ></iframe>
-
         <!-- Native HTML5 Video Element (for Pixeldrain / Krakenfiles / MP4 / HLS streams) -->
         <video
-          v-else
           id="vnime-player"
           playsinline
           class="w-full h-full object-contain"

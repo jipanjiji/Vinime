@@ -9,14 +9,13 @@ const CHROME_HEADERS = {
 export async function resolveClientVideoUrl(url: string) {
   if (!url) return null
 
-  // 1. Pixeldrain direct API link
+  // 1. Pixeldrain direct API stream link (1080p, 720p, 480p, 360p)
   if (url.includes('pixeldrain.com')) {
     const match = url.match(/pixeldrain\.com\/(?:u|file|api\/file)\/([a-zA-Z0-9]+)/)
     if (match) {
       const fileId = match[1]
       return {
         rawVideoUrl: `https://pixeldrain.com/api/file/${fileId}?download`,
-        isIframe: false,
         isHls: false
       }
     }
@@ -26,7 +25,6 @@ export async function resolveClientVideoUrl(url: string) {
   if (url.endsWith('.mp4') || url.includes('.m3u8') || url.includes('wibufile.com') || url.includes('googlevideo.com') || url.includes('blogspot.com') || url.includes('filedon.co')) {
     return {
       rawVideoUrl: url,
-      isIframe: false,
       isHls: url.includes('.m3u8')
     }
   }
@@ -41,20 +39,13 @@ export async function resolveClientVideoUrl(url: string) {
         const videoSrc = $('video source').attr('src') || $('video#my-video source').attr('src') || $('a[href*="/download/"]').attr('href')
         if (videoSrc) {
           const directUrl = videoSrc.startsWith('http') ? videoSrc : `https:${videoSrc}`
-          return { rawVideoUrl: directUrl, isIframe: false, isHls: false }
+          return { rawVideoUrl: directUrl, isHls: false }
         }
       }
     } catch {}
   }
 
-  // 4. Default / Iframes (Otakudesu, Desustream, Streamhide, etc.)
-  const isIframe = url.includes('otakudesu.') || url.includes('desudrive.') || url.includes('desustream.') || url.includes('/embed/') || url.includes('iframe') || !url.endsWith('.mp4')
-
-  return {
-    rawVideoUrl: url,
-    isIframe,
-    isHls: url.includes('.m3u8')
-  }
+  return null
 }
 
 export async function fetchClientHomeFeed() {
@@ -413,7 +404,7 @@ export async function fetchClientEpisode(epSlug: string) {
   const videoSources: Array<{ label: string; url: string; quality: string }> = []
   const cleanSlug = epSlug.replace(/^nonton-/, '').replace(/\/$/, '')
 
-  // 1. Try Otakudesu Direct Client Scrape
+  // 1. Direct raw downloads & streams from Otakudesu
   const otakuUrls = [
     `https://otakudesu.cloud/episode/${cleanSlug}/`,
     `https://otakudesu.cloud/episode/${cleanSlug}-sub-indo/`,
@@ -427,100 +418,8 @@ export async function fetchClientEpisode(epSlug: string) {
       const html = await res.text()
       const $ep = cheerio.load(html)
 
-      let scriptWithNonce = ''
-      $ep('script').each((_, el) => {
-        const content = $ep(el).html()
-        if (content && content.includes('__x__nonce')) scriptWithNonce = content
-      })
-
-      if (scriptWithNonce) {
-        const actionMatches = [...scriptWithNonce.matchAll(/action\s*:\s*["']([a-f0-9]{32})["']/g)]
-        if (actionMatches.length >= 2) {
-          const streamAction = actionMatches[0][1]
-          const getNonceAction = actionMatches[1][1]
-
-          const ajaxUrlMatch = scriptWithNonce.match(/\$\.ajax\(["'](https?:\/\/[^"']+admin-ajax\.php)["']/) ||
-            scriptWithNonce.match(/["'](https?:\/\/[^"']+admin-ajax\.php)["']/)
-          const ajaxUrl = ajaxUrlMatch ? ajaxUrlMatch[1] : 'https://otakudesu.blog/wp-admin/admin-ajax.php'
-
-          const nonceBody = new URLSearchParams()
-          nonceBody.append('action', getNonceAction)
-
-          const nonceRes = await fetch(ajaxUrl, {
-            method: 'POST',
-            headers: {
-              ...CHROME_HEADERS,
-              'Referer': otUrl,
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: nonceBody.toString()
-          })
-
-          if (nonceRes.ok) {
-            const nonceJson = await nonceRes.json().catch(() => null)
-            const nonce = nonceJson?.data
-            if (nonce) {
-              const mirrorElements: Array<{ label: string; dataContent: string; quality: string }> = []
-              $ep('.mirrorstream a, .mirrorstream li a').each((_, el) => {
-                const dataContent = $ep(el).attr('data-content')
-                const label = $ep(el).text().trim()
-                let quality = 'unknown'
-                const parentUlClass = $ep(el).closest('ul').attr('class') || ''
-                const qualityMatch = parentUlClass.match(/m(\d+p)/)
-                if (qualityMatch) quality = qualityMatch[1]
-
-                if (dataContent) mirrorElements.push({ label, dataContent, quality })
-              })
-
-              await Promise.all(
-                mirrorElements.map(async (m) => {
-                  try {
-                    const decodedPayload = JSON.parse(atob(m.dataContent))
-                    const streamBody = new URLSearchParams()
-                    Object.keys(decodedPayload).forEach(key => {
-                      streamBody.append(key, String(decodedPayload[key]))
-                    })
-                    streamBody.append('nonce', nonce)
-                    streamBody.append('action', streamAction)
-
-                    const streamRes = await fetch(ajaxUrl, {
-                      method: 'POST',
-                      headers: {
-                        ...CHROME_HEADERS,
-                        'Referer': otUrl,
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        'X-Requested-With': 'XMLHttpRequest'
-                      },
-                      body: streamBody.toString()
-                    })
-
-                    if (streamRes.ok) {
-                      const streamJson = await streamRes.json().catch(() => null)
-                      if (streamJson?.data) {
-                        const playerHtml = atob(streamJson.data)
-                        const $iframe = cheerio.load(playerHtml)
-                        const iframeSrc = $iframe('iframe').attr('src')
-                        if (iframeSrc) {
-                          videoSources.push({
-                            label: `[Otakudesu] ${m.label} (${m.quality})`,
-                            url: iframeSrc,
-                            quality: m.quality
-                          })
-                        }
-                      }
-                    }
-                  } catch {}
-                })
-              )
-            }
-          }
-        }
-      }
-
-      // Direct downloads from Otakudesu
       $ep('.download ul li').each((_, el) => {
-        let quality = 'unknown'
+        let quality = '720p'
         const headerText = $ep(el).find('h4, strong').text().trim()
         const qualityMatch = headerText.match(/(\d+p|4k)/i)
         if (qualityMatch) quality = qualityMatch[1].toLowerCase()
@@ -528,12 +427,11 @@ export async function fetchClientEpisode(epSlug: string) {
         $ep(el).find('a').each((__, aEl) => {
           const href = $ep(aEl).attr('href') || ''
           const label = $ep(aEl).text().trim()
-          if (href && (href.includes('krakenfiles.com') || href.includes('pixeldrain.com') || href.includes('gofile.io') || href.includes('acefile.co'))) {
-            let mirrorName = label || 'Download Mirror'
-            if (href.includes('krakenfiles.com')) mirrorName = 'Krakenfiles'
-            else if (href.includes('pixeldrain.com')) mirrorName = 'Pixeldrain'
+          if (href && (href.includes('pixeldrain.com') || href.includes('krakenfiles.com') || href.includes('gofile.io') || href.includes('acefile.co'))) {
+            let mirrorName = label || 'Pixeldrain'
+            if (href.includes('pixeldrain.com')) mirrorName = 'Pixeldrain'
+            else if (href.includes('krakenfiles.com')) mirrorName = 'Krakenfiles'
             else if (href.includes('gofile.io')) mirrorName = 'Gofile'
-            else if (href.includes('acefile.co')) mirrorName = 'Acefile'
 
             videoSources.push({
               label: `[Otakudesu Direct] ${mirrorName} (${quality})`,
@@ -550,7 +448,7 @@ export async function fetchClientEpisode(epSlug: string) {
     }
   }
 
-  // 2. Try Kuronime Direct Client Scrape
+  // 2. Direct raw streams from Kuronime
   const kuronimeUrls = [
     `https://kuronime.sbs/${cleanSlug}/`,
     `https://kuronime.sbs/nonton-${cleanSlug}/`
@@ -563,7 +461,6 @@ export async function fetchClientEpisode(epSlug: string) {
       const html = await res.text()
       const $ep = cheerio.load(html)
 
-      // Direct download links from HTML
       $ep('a').each((_, el) => {
         const href = $ep(el).attr('href') || ''
         if (!href) return
@@ -574,11 +471,9 @@ export async function fetchClientEpisode(epSlug: string) {
         else if (parentText.includes('360')) quality = '360p'
 
         if (href.includes('pixeldrain.com') || href.includes('krakenfiles.com') || href.includes('gofile.io') || href.includes('acefile.co')) {
-          let mirror = 'Download'
+          let mirror = 'Pixeldrain'
           if (href.includes('pixeldrain.com')) mirror = 'Pixeldrain'
           else if (href.includes('krakenfiles.com')) mirror = 'Krakenfiles'
-          else if (href.includes('gofile.io')) mirror = 'Gofile'
-          else if (href.includes('acefile.co')) mirror = 'Acefile'
 
           if (!videoSources.some(v => v.url === href)) {
             videoSources.push({
@@ -590,7 +485,7 @@ export async function fetchClientEpisode(epSlug: string) {
         }
       })
 
-      // Try animeku.org hash POST
+      // Try animeku.org direct download links
       let hashVal = ''
       $ep('script').each((_, el) => {
         const content = $ep(el).html() || ''
@@ -630,14 +525,16 @@ export async function fetchClientEpisode(epSlug: string) {
             const decryptedBytes = CryptoJS.AES.decrypt(decryptedBase64, '3&!Z0M,VIZ;dZW==', { format: CryptoJSAesJson })
             const decryptedData = JSON.parse(decryptedBytes.toString(CryptoJS.enc.Utf8))
 
-            const embed = decryptedData.embed || {}
-            for (const quality in embed) {
-              const servers = embed[quality]
+            const download = decryptedData.download || {}
+            for (const quality in download) {
+              const mirrors = download[quality]
               const cleanQ = quality.replace(/^v/, '')
-              for (const serverName in servers) {
-                const url = servers[serverName]
-                if (url && !videoSources.some(s => s.url === url)) {
-                  videoSources.push({ label: `[Kuronime] ${serverName} (${cleanQ})`, url, quality: cleanQ })
+              for (const mirrorName in mirrors) {
+                const url = mirrors[mirrorName]
+                if (url && (url.includes('pixeldrain.com') || url.includes('krakenfiles.com') || url.includes('gofile.io'))) {
+                  if (!videoSources.some(s => s.url === url)) {
+                    videoSources.push({ label: `[Kuronime Direct] ${mirrorName} (${cleanQ})`, url, quality: cleanQ })
+                  }
                 }
               }
             }
