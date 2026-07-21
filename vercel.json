@@ -1,16 +1,3 @@
 {
-  "functions": {
-    "server/api/episode.ts": {
-      "maxDuration": 10
-    },
-    "server/api/home.ts": {
-      "maxDuration": 10
-    },
-    "server/api/anime.ts": {
-      "maxDuration": 10
-    },
-    "server/api/search.ts": {
-      "maxDuration": 10
-    }
-  }
+  "framework": "nuxt"
 }
