@@ -130,6 +130,37 @@ export default defineEventHandler(async (event) => {
           }
         }
       }
+
+      // Extract direct Kuronime download links from HTML links
+      $ep('a').each((_, el) => {
+        const href = $ep(el).attr('href') || ''
+        const text = $ep(el).text().trim()
+        const parentText = $ep(el).parent().text().trim()
+        const fullText = `${text} ${parentText}`
+
+        let quality = '720p'
+        if (fullText.toLowerCase().includes('1080')) quality = '1080p'
+        else if (fullText.toLowerCase().includes('480')) quality = '480p'
+        else if (fullText.toLowerCase().includes('360')) quality = '360p'
+        else if (fullText.toLowerCase().includes('4k') || fullText.toLowerCase().includes('2160')) quality = '4K'
+
+        if (href && (href.includes('pixeldrain.com') || href.includes('krakenfiles.com') || href.includes('gofile.io') || href.includes('acefile.co') || href.includes('filelions'))) {
+          let mirrorName = text || 'Download'
+          if (href.includes('pixeldrain.com')) mirrorName = 'Pixeldrain'
+          else if (href.includes('krakenfiles.com')) mirrorName = 'Krakenfiles'
+          else if (href.includes('gofile.io')) mirrorName = 'Gofile'
+          else if (href.includes('acefile.co')) mirrorName = 'Acefile'
+
+          const exists = videoSources.some(s => s.url === href)
+          if (!exists) {
+            videoSources.push({
+              label: `[Kuronime Direct] ${mirrorName} (${quality})`,
+              url: href,
+              quality
+            })
+          }
+        }
+      })
     } catch (krErr: any) {
       console.warn('[Episode Engine] Kuronime primary scraping failed:', krErr.message)
     }

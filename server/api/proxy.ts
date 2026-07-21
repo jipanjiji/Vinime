@@ -1,4 +1,4 @@
-import { defineEventHandler, getQuery, createError, setHeader, setResponseStatus } from 'h3'
+import { defineEventHandler, getQuery, createError, setHeader, setResponseStatus, sendStream } from 'h3'
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
@@ -101,7 +101,11 @@ export default defineEventHandler(async (event) => {
     // Always allow cross-origin access
     setHeader(event, 'Access-Control-Allow-Origin', '*')
 
-    // Read body as ArrayBuffer — works reliably on Vercel serverless (no Node stream needed)
+    if (response.body) {
+      const { Readable } = await import('stream')
+      return sendStream(event, Readable.fromWeb(response.body as any))
+    }
+
     const buffer = await response.arrayBuffer()
     return Buffer.from(buffer)
 

@@ -221,7 +221,9 @@ async function playResolution(quality, hostIndex = 0) {
 
     const rawUrl = resolveData.rawVideoUrl
     const isDirectPlay = rawUrl.includes('wibufile.com') || rawUrl.includes('archive.org') ||
-      rawUrl.includes('cloudflarestorage.com') || rawUrl.includes('filedon.co')
+      rawUrl.includes('cloudflarestorage.com') || rawUrl.includes('filedon.co') ||
+      rawUrl.includes('googlevideo.com') || rawUrl.includes('blogger.com') ||
+      rawUrl.includes('blogspot.com') || rawUrl.includes('googleusercontent.com')
     const playUrl = isDirectPlay
       ? rawUrl
       : `/api/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent(src.url)}`
