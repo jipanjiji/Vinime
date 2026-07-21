@@ -2,6 +2,7 @@
 import { ref, watch, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
 import { useRoute, useRouter, useHead } from '#app'
 import Hls from 'hls.js'
+import { ScreenOrientation } from '@capacitor/screen-orientation'
 import { saveEpisodeProgress, getEpisodeProgress } from '~/utils/storage'
 import { fetchClientEpisode, resolveClientVideoUrl } from '~/utils/clientScraper'
 
@@ -349,36 +350,16 @@ async function playResolution(quality, hostIndex = 0) {
       window.location.hostname === '127.0.0.1'
     )
 
-    // In Android APK, fetch Pixeldrain via native Capacitor fetch to bypass Webview Origin 403
-    if (isCapacitor && rawUrl.includes('pixeldrain.com')) {
-      try {
-        const res = await fetch(rawUrl).catch(() => null)
-        if (res?.ok) {
-          const blob = await res.blob()
-          const blobUrl = URL.createObjectURL(blob)
-          selectedVideo.value = {
-            title: src.label,
-            quality,
-            playUrl: blobUrl,
-            isHls: false
-          }
-          isResolving.value = false
-          return
-        }
-      } catch (e) {
-        console.warn('[APK Player] Blob fetch fallback:', e)
-      }
-    }
-
     const isDirectPlay = isCapacitor ||
       rawUrl.includes('wibufile.com') || rawUrl.includes('archive.org') ||
       rawUrl.includes('cloudflarestorage.com') || rawUrl.includes('filedon.co') ||
       rawUrl.includes('googlevideo.com') || rawUrl.includes('blogger.com') ||
-      rawUrl.includes('blogspot.com') || rawUrl.includes('googleusercontent.com')
+      rawUrl.includes('blogspot.com') || rawUrl.includes('googleusercontent.com') ||
+      rawUrl.includes('pixeldrain.com')
 
     const playUrl = isDirectPlay
-      ? rawUrl
-      : `/api/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent(rawUrl.includes('pixeldrain.com') ? 'https://pixeldrain.com/' : (src.url || ''))}`
+      ? rawUrl.replace(/\?download$/, '')
+      : `/api/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent('https://pixeldrain.com/')}`
 
     selectedVideo.value = {
       title: src.label,
@@ -585,12 +566,35 @@ function toggleSpeed() {
   v.playbackRate = playbackSpeed.value
 }
 
-function toggleFullscreen() {
+async function toggleFullscreen() {
   const c = document.getElementById('video-container')
   if (!c) return
-  document.fullscreenElement
-    ? document.exitFullscreen().then(() => { isFullscreen.value = false })
-    : c.requestFullscreen().then(() => { isFullscreen.value = true }).catch(() => {})
+
+  if (isFullscreen.value || document.fullscreenElement) {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen()
+      }
+    } catch {}
+    isFullscreen.value = false
+    try {
+      await ScreenOrientation.unlock()
+    } catch {}
+  } else {
+    try {
+      await c.requestFullscreen()
+    } catch {}
+    isFullscreen.value = true
+    try {
+      await ScreenOrientation.lock({ orientation: 'landscape' })
+    } catch {
+      try {
+        if (screen.orientation && screen.orientation.lock) {
+          await screen.orientation.lock('landscape')
+        }
+      } catch {}
+    }
+  }
 }
 
 function seekRelative(amount) {
