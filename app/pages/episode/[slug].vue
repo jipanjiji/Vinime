@@ -138,12 +138,12 @@ async function loadEpisodeData() {
   try {
     // Run server scrape + client-side Kuronime hash fetch in parallel
     const [data, hashData] = await Promise.all([
-      $fetch(`/api/episode?slug=${encodeURIComponent(epSlug.value)}`),
+      $fetch(`/api/episode?slug=${encodeURIComponent(epSlug.value)}`).catch(() => null),
       $fetch(`/api/kuronime-hash?slug=${encodeURIComponent(epSlug.value)}`).catch(() => null)
     ])
 
     // Merge client-side Kuronime sources if server scraping was blocked
-    const allSources = [...(data.videoSources || [])]
+    const allSources = [...(data?.videoSources || [])]
 
     if (hashData?.success) {
       // 1. Add direct HTML links (Pixeldrain, Krakenfiles extracted from page HTML)
@@ -217,10 +217,18 @@ async function loadEpisodeData() {
       }
     }
 
-    if (allSources.length > 0) {
-      parentAnime.value = data.anime
+    if (allSources.length === 0) {
+      // Direct Native Client Scrape on user's device (bypasses Vercel Server 500/403)
+      const clientResult = await fetchClientEpisode(epSlug.value)
+      if (clientResult?.success) {
+        allSources.push(...clientResult.videoSources)
+      }
+    }
 
-      if (data.anime?.episodes) {
+    if (allSources.length > 0) {
+      parentAnime.value = data?.anime
+
+      if (data?.anime?.episodes) {
         const cur = data.anime.episodes.find(e => e.slug === epSlug.value)
         currentEpisodeNumber.value = cur ? cur.episodeNumber : ''
       }
