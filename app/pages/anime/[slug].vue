@@ -31,16 +31,25 @@ onMounted(async () => {
   await fetchAnimeDetails()
 })
 
+import { fetchClientAnimeDetail } from '~/utils/clientScraper'
+
 async function fetchAnimeDetails() {
   detailLoading.value = true
   errorMsg.value = ''
   try {
-    const data = await $fetch(`/api/anime?slug=${encodeURIComponent(slug)}`)
-    if (data.success) {
+    const data = await $fetch(`/api/anime?slug=${encodeURIComponent(slug)}`).catch(() => null)
+    if (data?.success && data.title) {
       animeDetails.value = data
       subscribed.value = isSubscribed(slug)
+      return
+    }
+
+    const clientData = await fetchClientAnimeDetail(slug)
+    if (clientData?.success) {
+      animeDetails.value = clientData
+      subscribed.value = isSubscribed(slug)
     } else {
-      errorMsg.value = data.message || 'Gagal memuat detail anime.'
+      errorMsg.value = 'Gagal memuat detail anime.'
     }
   } catch (err) {
     errorMsg.value = err.message || 'Terjadi kesalahan.'

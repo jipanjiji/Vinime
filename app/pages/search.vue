@@ -28,6 +28,8 @@ watch(
   }
 )
 
+import { fetchClientSearch } from '~/utils/clientScraper'
+
 async function performSearch() {
   if (!query.value.trim()) {
     searchResults.value = []
@@ -38,11 +40,17 @@ async function performSearch() {
   hasSearched.value = true
   errorMsg.value = ''
   try {
-    const data = await $fetch(`/api/search?q=${encodeURIComponent(query.value)}`)
-    if (data.success) {
+    const data = await $fetch(`/api/search?q=${encodeURIComponent(query.value)}`).catch(() => null)
+    if (data?.success && data.results?.length > 0) {
       searchResults.value = data.results
+      return
+    }
+
+    const clientData = await fetchClientSearch(query.value)
+    if (clientData?.success) {
+      searchResults.value = clientData.results
     } else {
-      errorMsg.value = data.message || 'Pencarian gagal.'
+      errorMsg.value = 'Pencarian tidak ditemukan.'
     }
   } catch (err) {
     errorMsg.value = err.message || 'Terjadi kesalahan.'

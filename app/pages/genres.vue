@@ -12,19 +12,29 @@ onMounted(async () => {
   await loadGenres()
 })
 
+import { fetchClientGenres } from '~/utils/clientScraper'
+
 async function loadGenres() {
   isLoadingList.value = true
   errorMsg.value = ''
   try {
-    const data = await $fetch('/api/genres')
-    if (data.success) {
+    const data = await $fetch('/api/genres').catch(() => null)
+    if (data?.success && data.genres?.length > 0) {
       genresList.value = data.genres
-      // Select the first genre by default
       if (data.genres.length > 0) {
         await selectGenre(data.genres[0].slug)
       }
+      return
+    }
+
+    const clientData = await fetchClientGenres()
+    if (clientData?.success) {
+      genresList.value = clientData.genres
+      if (clientData.genres.length > 0) {
+        await selectGenre(clientData.genres[0].slug)
+      }
     } else {
-      errorMsg.value = data.message || 'Gagal memuat daftar genre.'
+      errorMsg.value = 'Gagal memuat daftar genre.'
     }
   } catch (err) {
     errorMsg.value = err.message || 'Koneksi ke server gagal.'
@@ -39,11 +49,17 @@ async function selectGenre(slug) {
   errorMsg.value = ''
   animeList.value = []
   try {
-    const data = await $fetch(`/api/genres?genre=${encodeURIComponent(slug)}`)
-    if (data.success) {
+    const data = await $fetch(`/api/genres?genre=${encodeURIComponent(slug)}`).catch(() => null)
+    if (data?.success && data.animeList?.length > 0) {
       animeList.value = data.animeList
+      return
+    }
+
+    const clientData = await fetchClientGenres(slug)
+    if (clientData?.success) {
+      animeList.value = clientData.animeList
     } else {
-      errorMsg.value = data.message || 'Gagal memuat anime genre ini.'
+      errorMsg.value = 'Gagal memuat anime genre ini.'
     }
   } catch (err) {
     errorMsg.value = err.message || 'Gagal terhubung ke server.'

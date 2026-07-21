@@ -134,6 +134,230 @@ export async function fetchClientHomeFeed() {
   }
 }
 
+export async function fetchClientAnimeDetail(slug: string) {
+  const targetUrl = `https://kuronime.sbs/anime/${slug}/`
+  try {
+    const res = await fetch(targetUrl, { headers: CHROME_HEADERS })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const html = await res.text()
+    const $ = cheerio.load(html)
+
+    const title = $('.entry-title').text().trim() || $('h1.entry-title').text().trim() || 'Anime Detail'
+    const cover = $('.entry-content .main-info .con .l img').attr('src') ||
+                  $('img[itemprop="image"]').attr('src') || ''
+    const synopsis = $('.sinopsis p, .entry-content p, .desc p').first().text().trim() ||
+                     $('.sinopsis, .entry-content, .desc').text().trim() || ''
+
+    let alternativeTitle = ''
+    let type = 'TV'
+    let status = 'Unknown'
+    let studio = 'Unknown'
+    let season = 'Unknown'
+    let episodesCount = '1'
+    let released = 'Unknown'
+    const genres: string[] = []
+
+    $('.entry-content .infodetail ul li').each((_, el) => {
+      const text = $(el).text().trim()
+      if (text.startsWith('Judul:')) {
+        alternativeTitle = text.replace('Judul:', '').trim()
+      } else if (text.startsWith('Genre:')) {
+        $(el).find('a').each((__, a) => {
+          genres.push($(a).text().trim())
+        })
+      } else if (text.startsWith('Status:')) {
+        status = text.replace('Status:', '').trim()
+      } else if (text.startsWith('Studio:')) {
+        studio = $(el).find('a').text().trim() || text.replace('Studio:', '').trim()
+      } else if (text.startsWith('Season:')) {
+        season = $(el).find('a').text().trim() || text.replace('Season:', '').trim()
+      } else if (text.startsWith('Tipe:')) {
+        type = text.replace('Tipe:', '').trim()
+      } else if (text.startsWith('Jumlah Episode:')) {
+        episodesCount = text.replace('Jumlah Episode:', '').trim()
+      } else if (text.startsWith('Tayang:') || text.startsWith('Released on:')) {
+        released = text.replace(/Tayang:|Released on:/, '').trim()
+      }
+    })
+
+    const episodesList: Array<{ title: string; slug: string; episodeNumber: string }> = []
+    $('.bixbox.bxcl ul li').each((_, el) => {
+      const epLabel = $(el).find('.lchx a').text().trim()
+      const epHref = $(el).find('.lchx a').attr('href') || ''
+      let episodeNumber = '1'
+      const numMatch = epLabel.match(/(\d+(?:\.\d+)?)/)
+      if (numMatch) episodeNumber = numMatch[1]
+
+      if (epHref) {
+        try {
+          const parsedUrl = new URL(epHref)
+          const epSlug = parsedUrl.pathname.replace(/^\/|\/$/g, '')
+          episodesList.push({ title: epLabel, slug: epSlug, episodeNumber })
+        } catch {}
+      }
+    })
+
+    const rawScore = $('.numscore').first().text().trim() || $('.rating .num').first().text().trim() || $('.rating').first().text().trim() || ''
+    const scoreMatch = rawScore.match(/(\d+\.?\d*)/)
+    const score = scoreMatch ? scoreMatch[1] : '0.0'
+
+    episodesList.reverse()
+
+    return {
+      success: true,
+      title,
+      slug,
+      cover,
+      synopsis,
+      score,
+      alternativeTitle,
+      type,
+      status,
+      studio,
+      season,
+      episodesCount,
+      released,
+      genres,
+      episodes: episodesList
+    }
+  } catch (err: any) {
+    console.warn('[Client Scraper] Anime detail failed:', err)
+    return { success: false, episodes: [] }
+  }
+}
+
+export async function fetchClientSearch(q: string) {
+  const targetUrl = `https://kuronime.sbs/?s=${encodeURIComponent(q)}`
+  try {
+    const res = await fetch(targetUrl, { headers: CHROME_HEADERS })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const html = await res.text()
+    const $ = cheerio.load(html)
+
+    const results: Array<any> = []
+    $('.listupd article, .listupd .bs, .search-page article').each((_, el) => {
+      const linkEl = $(el).find('a').first()
+      const href = linkEl.attr('href') || ''
+      const title = $(el).find('.bsuxtt h2').text().trim() || $(el).find('h2').text().trim() || linkEl.attr('title')?.replace(/\s*subtitle\s*indonesia/i, '').trim() || 'Anime'
+      const cover = $(el).find('img[itemprop="image"]').attr('src') ||
+                    $(el).find('img:not(.dashicons-controls-play)').first().attr('src') || ''
+      const rawScore = $(el).find('.numscore').text().trim() || $(el).find('.rating .num').text().trim() || $(el).find('.rating').text().trim() || ''
+      const scoreMatch = rawScore.match(/(\d+\.?\d*)/)
+      const score = scoreMatch ? scoreMatch[1] : '0.0'
+      const type = $(el).find('.typez').text().trim() || 'TV'
+      const status = $(el).find('.ep').text().trim() || 'Completed'
+      const synopsis = $(el).find('.entry-content p, .sinopsis p').text().trim() || ''
+
+      if (href) {
+        try {
+          const parsedUrl = new URL(href)
+          let slug = ''
+          if (parsedUrl.pathname.startsWith('/anime/')) {
+            slug = parsedUrl.pathname.replace(/^\/anime\//, '').replace(/\/$/, '')
+          } else {
+            slug = parsedUrl.pathname
+              .replace(/^\/|\/$/g, '')
+              .replace(/^nonton-/, '')
+              .replace(/-episode-\d+.*$/, '')
+              .replace(/-eps-\d+.*$/, '')
+          }
+
+          if (slug) {
+            results.push({
+              title,
+              slug,
+              cover,
+              score,
+              type,
+              status,
+              synopsis,
+              genres: []
+            })
+          }
+        } catch {}
+      }
+    })
+
+    return { success: true, results }
+  } catch (err: any) {
+    console.warn('[Client Scraper] Search failed:', err)
+    return { success: false, results: [] }
+  }
+}
+
+export async function fetchClientGenres(genreSlug?: string) {
+  if (genreSlug) {
+    const targetUrl = `https://kuronime.sbs/genres/${genreSlug}/`
+    try {
+      const res = await fetch(targetUrl, { headers: CHROME_HEADERS })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const html = await res.text()
+      const $ = cheerio.load(html)
+
+      const animeList: Array<any> = []
+      $('.listupd article, .listupd .bs').each((_, el) => {
+        const title = $(el).find('h2, h3, .title').text().trim()
+        const href = $(el).find('a').first().attr('href') || ''
+        const cover = $(el).find('img[itemprop="image"]').attr('src') ||
+                      $(el).find('img:not(.dashicons-controls-play)').first().attr('src') || ''
+        const type = $(el).find('.typez').text().trim() || 'TV'
+        const ratingRaw = $(el).find('.numscore').text().trim() || $(el).find('.rating .num').text().trim() || ''
+        const ratingMatch = ratingRaw.match(/(\d+\.?\d*)/)
+        const rating = ratingMatch ? ratingMatch[1] : '0.0'
+
+        if (href && title) {
+          try {
+            const parsedUrl = new URL(href)
+            const slug = parsedUrl.pathname.replace(/^\/anime\//, '').replace(/\/$/, '')
+            animeList.push({ title, slug, cover, type, rating })
+          } catch {}
+        }
+      })
+
+      const genreTitle = $('title').text().replace(' - Kuronime', '').trim()
+
+      return { success: true, genreName: genreTitle, animeList }
+    } catch (err: any) {
+      console.warn('[Client Scraper] Genre item failed:', err)
+      return { success: false, animeList: [] }
+    }
+  } else {
+    const targetUrl = 'https://kuronime.sbs/genres/'
+    try {
+      const res = await fetch(targetUrl, { headers: CHROME_HEADERS })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const html = await res.text()
+      const $ = cheerio.load(html)
+
+      const genresList: Array<{ name: string; slug: string }> = []
+      const seenSlugs = new Set<string>()
+
+      $('ul.genres a, .genreslist a, .tagcloud a, a[href*="/genres/"]').each((_, el) => {
+        const name = $(el).text().trim()
+        const href = $(el).attr('href') || ''
+
+        if (href && name && name.toLowerCase() !== 'genres') {
+          try {
+            const parsedUrl = new URL(href)
+            const slug = parsedUrl.pathname.replace(/^\/genres\//, '').replace(/\/$/, '')
+            if (slug && !seenSlugs.has(slug)) {
+              seenSlugs.add(slug)
+              genresList.push({ name, slug })
+            }
+          } catch {}
+        }
+      })
+
+      genresList.sort((a, b) => a.name.localeCompare(b.name))
+
+      return { success: true, genres: genresList }
+    } catch (err: any) {
+      console.warn('[Client Scraper] Genres list failed:', err)
+      return { success: false, genres: [] }
+    }
+  }
+}
+
 export async function fetchClientEpisode(epSlug: string) {
   const videoSources: Array<{ label: string; url: string; quality: string }> = []
   const cleanSlug = epSlug.replace(/^nonton-/, '').replace(/\/$/, '')
