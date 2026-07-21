@@ -1,6 +1,5 @@
 import { defineEventHandler, getQuery, createError } from 'h3'
 import * as cheerio from 'cheerio'
-import http2 from 'http2'
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
@@ -59,36 +58,14 @@ export default defineEventHandler(async (event) => {
   }
 })
 
-function fetchHttp2(target: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const url = new URL(target)
-    const client = http2.connect(`https://${url.hostname}`)
-
-    client.on('error', (err) => {
-      reject(err)
-    })
-
-    const req = client.request({
-      ':method': 'GET',
-      ':path': url.pathname + url.search,
-      ':authority': url.hostname,
-      ':scheme': 'https',
-      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'accept-language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
-    })
-
-    let responseData = ''
-    req.setEncoding('utf8')
-    req.on('data', (chunk) => {
-      responseData += chunk
-    })
-
-    req.on('end', () => {
-      client.close()
-      resolve(responseData)
-    })
-
-    req.end()
+async function fetchHttp2(target: string): Promise<string> {
+  const res = await fetch(target, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+    },
+    signal: AbortSignal.timeout(8000)
   })
+  return res.text()
 }

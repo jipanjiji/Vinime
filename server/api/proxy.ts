@@ -1,5 +1,4 @@
-import { defineEventHandler, getQuery, createError, setHeader } from 'h3'
-import { Readable } from 'stream'
+import { defineEventHandler, getQuery, createError, setHeader, setResponseStatus } from 'h3'
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
@@ -16,7 +15,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     const parsedUrl = new URL(videoUrl)
-    
+
     // Validate target URL protocols
     if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
       throw createError({
@@ -25,7 +24,7 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    // Set up custom spoofed headers to send to the video host
+    // Set up spoofed headers to send to the video host
     const headers: Record<string, string> = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Accept': '*/*',
@@ -45,10 +44,10 @@ export default defineEventHandler(async (event) => {
     // Forward the byte-range request header from the client browser
     const clientRange = event.node.req.headers['range']
     if (clientRange) {
-      headers['Range'] = clientRange
+      headers['Range'] = clientRange as string
     }
 
-    // SCENARIO A: If the target is an HLS playlist (.m3u8), we rewrite its contents.
+    // SCENARIO A: HLS playlist (.m3u8) — rewrite segment URLs to proxy through us
     if (parsedUrl.pathname.endsWith('.m3u8')) {
       const m3u8Text = await $fetch<string>(videoUrl, {
         headers,
@@ -63,8 +62,7 @@ export default defineEventHandler(async (event) => {
       return rewrittenM3u8
     }
 
-    // SCENARIO B: Direct MP4 or TS segment files are piped directly through native Node stream piping
-    // to preserve Content-Length and avoid transfer-encoding: chunked blocks.
+    // SCENARIO B: Direct MP4/TS segment — buffer and return (Vercel-compatible, no Node streams)
     const response = await fetch(videoUrl, {
       headers,
       redirect: 'follow'
@@ -86,9 +84,9 @@ export default defineEventHandler(async (event) => {
     }
 
     // Forward status code
-    event.node.res.statusCode = response.status
+    setResponseStatus(event, response.status)
 
-    // Copy response headers to event (skipping transport-level headers)
+    // Copy relevant response headers (skip transport-level headers)
     response.headers.forEach((value, key) => {
       const lowerKey = key.toLowerCase()
       if (
@@ -100,21 +98,13 @@ export default defineEventHandler(async (event) => {
       }
     })
 
-    // Ensure CORS is allowed
+    // Always allow cross-origin access
     setHeader(event, 'Access-Control-Allow-Origin', '*')
 
-    if (response.body) {
-      // Convert standard Web ReadableStream to Node Readable stream and pipe
-      Readable.fromWeb(response.body as any).pipe(event.node.res)
-      
-      // Wait for the response stream piping to finish
-      await new Promise<void>((resolve) => {
-        event.node.res.on('finish', () => resolve())
-        event.node.res.on('close', () => resolve())
-      })
-    }
-    
-    return
+    // Read body as ArrayBuffer — works reliably on Vercel serverless (no Node stream needed)
+    const buffer = await response.arrayBuffer()
+    return Buffer.from(buffer)
+
   } catch (error: any) {
     throw createError({
       statusCode: error.statusCode || 500,
@@ -124,18 +114,18 @@ export default defineEventHandler(async (event) => {
 })
 
 /**
- * Helper to rewrite HLS playlist files (.m3u8) so that all child paths
- * (segments and sub-playlists) route back through our proxy server.
+ * Rewrite HLS playlist (.m3u8) so all child segment/playlist URLs
+ * are routed back through our proxy endpoint.
  */
 function rewriteM3u8(m3u8Text: string, playlistUrl: string, referer: string, origin: string): string {
   const lines = m3u8Text.split('\n')
   const baseUrl = new URL(playlistUrl)
-  
+
   const rewrittenLines = lines.map(line => {
     const trimmed = line.trim()
     if (!trimmed) return line
 
-    // Scenario 1: Metadata line with URI attribute (e.g. URI="iframes.m3u8")
+    // Metadata line with URI attribute (e.g. URI="iframes.m3u8")
     if (trimmed.startsWith('#')) {
       return trimmed.replace(/URI=["']([^"']+)["']/g, (match, relativeUri) => {
         try {
@@ -148,7 +138,7 @@ function rewriteM3u8(m3u8Text: string, playlistUrl: string, referer: string, ori
       })
     }
 
-    // Scenario 2: Direct URL or relative path to a segment/sub-playlist
+    // Direct URL or relative path to segment/sub-playlist
     try {
       const absoluteUri = new URL(trimmed, baseUrl.href).href
       return `/api/proxy?url=${encodeURIComponent(absoluteUri)}&referer=${encodeURIComponent(referer)}`
