@@ -1,0 +1,334 @@
+/* ============================================
+   VNIME — Global Design System
+   Premium Dark Cinematic Theme
+   ============================================ */
+
+/* --- Google Font Import --- */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800&display=swap');
+
+/* --- Design Tokens --- */
+:root {
+  --bg-primary: #06060e;
+  --bg-card: #0f0f1a;
+  --bg-elevated: #161625;
+  --bg-glass: rgba(15, 15, 26, 0.7);
+  --bg-glass-heavy: rgba(15, 15, 26, 0.92);
+
+  --border-subtle: #1e1e35;
+  --border-hover: #2d2d50;
+  --border-accent: rgba(124, 92, 252, 0.35);
+
+  --text-primary: #eeeef5;
+  --text-secondary: #8585a8;
+  --text-muted: #4a4a6a;
+
+  --accent: #7c5cfc;
+  --accent-hover: #9b7eff;
+  --accent-glow: rgba(124, 92, 252, 0.2);
+  --accent-glow-strong: rgba(124, 92, 252, 0.35);
+
+  --status-ongoing: #f59e0b;
+  --status-completed: #10b981;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+/* --- Base Reset --- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* --- Custom Scrollbar --- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-hover);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-hover) transparent;
+}
+
+/* --- Skeleton Loader Animation --- */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-card) 25%,
+    var(--bg-elevated) 50%,
+    var(--bg-card) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* --- Utility Animations --- */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  50% { box-shadow: 0 0 20px 4px var(--accent-glow); }
+}
+
+.anim-fade-in {
+  animation: fadeIn 0.4s ease-out both;
+}
+
+.anim-fade-up {
+  animation: fadeInUp 0.5s ease-out both;
+}
+
+.anim-fade-down {
+  animation: fadeInDown 0.4s ease-out both;
+}
+
+.anim-scale-in {
+  animation: scaleIn 0.3s ease-out both;
+}
+
+/* Staggered animation delays */
+.anim-delay-1 { animation-delay: 0.05s; }
+.anim-delay-2 { animation-delay: 0.1s; }
+.anim-delay-3 { animation-delay: 0.15s; }
+.anim-delay-4 { animation-delay: 0.2s; }
+.anim-delay-5 { animation-delay: 0.25s; }
+.anim-delay-6 { animation-delay: 0.3s; }
+
+/* --- Page Transitions --- */
+.page-enter-active,
+.page-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* --- Card Hover Glow Effect --- */
+.card-hover {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--border-hover);
+  border-color: var(--border-hover) !important;
+}
+
+.card-glow:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3), 0 0 20px var(--accent-glow);
+  border-color: var(--border-accent) !important;
+}
+
+/* --- Video Player Slider --- */
+.player-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+  transition: height 0.15s ease;
+}
+
+.player-slider:hover {
+  height: 6px;
+}
+
+.player-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+  transition: transform 0.15s ease;
+}
+
+.player-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.2);
+}
+
+.player-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+}
+
+/* Volume slider */
+.vol-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 3px;
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+}
+
+.vol-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+}
+
+.vol-slider::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+/* --- Horizontal Scroll Container (no scrollbar) --- */
+.scroll-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+.scroll-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* --- Glass Effect Utilities --- */
+.glass {
+  background: var(--bg-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.glass-heavy {
+  background: var(--bg-glass-heavy);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+/* --- Fullscreen Video Override --- */
+#video-container:fullscreen,
+#video-container:-webkit-full-screen {
+  background: black;
+  aspect-ratio: auto;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0;
+}
+
+/* --- Mobile Bottom Nav Safe Area --- */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .bottom-nav {
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* --- Focus Styles --- */
+input:focus,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+button:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* --- Line Clamp Utilities --- */
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
