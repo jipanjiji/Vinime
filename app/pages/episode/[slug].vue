@@ -343,7 +343,14 @@ async function playResolution(quality, hostIndex = 0) {
     }
 
     const rawUrl = resolveData.rawVideoUrl
-    const isDirectPlay = rawUrl.includes('wibufile.com') || rawUrl.includes('archive.org') ||
+    const isCapacitor = typeof window !== 'undefined' && (
+      window.location.protocol === 'capacitor:' ||
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1'
+    )
+
+    const isDirectPlay = isCapacitor ||
+      rawUrl.includes('wibufile.com') || rawUrl.includes('archive.org') ||
       rawUrl.includes('cloudflarestorage.com') || rawUrl.includes('filedon.co') ||
       rawUrl.includes('googlevideo.com') || rawUrl.includes('blogger.com') ||
       rawUrl.includes('blogspot.com') || rawUrl.includes('googleusercontent.com')
