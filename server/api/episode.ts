@@ -446,8 +446,9 @@ export default defineEventHandler(async (event) => {
                 const streamAction = actionMatches[0][1]
                 const getNonceAction = actionMatches[1][1]
 
-                const parsedOrigin = new URL(otakudesuEpisodeUrl).origin
-                const ajaxUrl = `${parsedOrigin}/wp-admin/admin-ajax.php`
+                const ajaxUrlMatch = scriptWithNonce.match(/\$\.ajax\(["'](https?:\/\/[^"']+admin-ajax\.php)["']/) ||
+                  scriptWithNonce.match(/["'](https?:\/\/[^"']+admin-ajax\.php)["']/)
+                const ajaxUrl = ajaxUrlMatch ? ajaxUrlMatch[1] : `${new URL(otakudesuEpisodeUrl).origin}/wp-admin/admin-ajax.php`
 
                 const nonceBody = new URLSearchParams()
                 nonceBody.append('action', getNonceAction)
@@ -455,7 +456,7 @@ export default defineEventHandler(async (event) => {
                 const nonceData = await $fetch<{ data: string }>(ajaxUrl, {
                   method: 'POST',
                   headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    ...odEpHeaders,
                     'Referer': otakudesuEpisodeUrl,
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'X-Requested-With': 'XMLHttpRequest'
@@ -492,7 +493,7 @@ export default defineEventHandler(async (event) => {
                         const streamData = await $fetch<{ data: string }>(ajaxUrl, {
                           method: 'POST',
                           headers: {
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                            ...odEpHeaders,
                             'Referer': otakudesuEpisodeUrl,
                             'Content-Type': 'application/x-www-form-urlencoded',
                             'X-Requested-With': 'XMLHttpRequest'
@@ -631,6 +632,83 @@ export default defineEventHandler(async (event) => {
           }
         } catch (aiErr: any) {
           console.warn('[Episode Engine] Animeindo scraping failed:', aiErr.message)
+        }
+      })(),
+
+      // 4. Kuronime Scraper Engine (Direct download mirrors fallback)
+      (async () => {
+        try {
+          const chromeHeaders = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8'
+          }
+          let kuronimeEpisodeUrl = ''
+          for (const q of uniqueQueries) {
+            try {
+              const searchUrl = `https://kuronime.sbs/?s=${encodeURIComponent(q)}`
+              const html = await $fetch<string>(searchUrl, { headers: chromeHeaders, timeout: 5000 }).catch(() => '')
+              if (!html) continue
+              const $search = cheerio.load(html)
+              
+              let matchedAnimeLink = ''
+              $search('article a[href*="/anime/"], .listupd a[href*="/anime/"]').each((_, el) => {
+                const href = $search(el).attr('href') || ''
+                if (href) {
+                  matchedAnimeLink = href
+                  return false
+                }
+              })
+
+              if (matchedAnimeLink) {
+                const animeHtml = await $fetch<string>(matchedAnimeLink, { headers: chromeHeaders }).catch(() => '')
+                if (!animeHtml) continue
+                const $anime = cheerio.load(animeHtml)
+
+                $anime('.bepisdb a, .episodelist ul li a').each((_, el) => {
+                  const href = $anime(el).attr('href') || ''
+                  if (matchEpisodeNumber(href, episodeNumber)) {
+                    kuronimeEpisodeUrl = href
+                    return false
+                  }
+                })
+
+                if (kuronimeEpisodeUrl) break
+              }
+            } catch {}
+          }
+
+          if (kuronimeEpisodeUrl) {
+            const epHtml = await $fetch<string>(kuronimeEpisodeUrl, { headers: chromeHeaders }).catch(() => '')
+            if (epHtml) {
+              const $ep = cheerio.load(epHtml)
+              $ep('a').each((_, el) => {
+                const href = $ep(el).attr('href') || ''
+                if (!href) return
+                const parentText = ($ep(el).parents().text() + ' ' + $ep(el).text()).toLowerCase()
+                let quality = '720p'
+                if (parentText.includes('1080')) quality = '1080p'
+                else if (parentText.includes('480')) quality = '480p'
+                else if (parentText.includes('360')) quality = '360p'
+
+                if (href.includes('pixeldrain.com') || href.includes('krakenfiles.com') || href.includes('gofile.io') || href.includes('acefile.co')) {
+                  let mirror = 'Download'
+                  if (href.includes('pixeldrain.com')) mirror = 'Pixeldrain'
+                  else if (href.includes('krakenfiles.com')) mirror = 'Krakenfiles'
+                  else if (href.includes('gofile.io')) mirror = 'Gofile'
+                  else if (href.includes('acefile.co')) mirror = 'Acefile'
+
+                  videoSources.push({
+                    label: `[Kuronime Direct] ${mirror} (${quality})`,
+                    url: href,
+                    quality
+                  })
+                }
+              })
+            }
+          }
+        } catch (kErr: any) {
+          console.warn('[Episode Engine] Kuronime fallback failed:', kErr.message)
         }
       })()
     ])
