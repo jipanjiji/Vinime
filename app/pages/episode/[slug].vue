@@ -346,12 +346,11 @@ async function playResolution(quality, hostIndex = 0) {
     const isDirectPlay = rawUrl.includes('wibufile.com') || rawUrl.includes('archive.org') ||
       rawUrl.includes('cloudflarestorage.com') || rawUrl.includes('filedon.co') ||
       rawUrl.includes('googlevideo.com') || rawUrl.includes('blogger.com') ||
-      rawUrl.includes('blogspot.com') || rawUrl.includes('googleusercontent.com') ||
-      rawUrl.includes('pixeldrain.com') || rawUrl.includes('krakenfiles.com')
+      rawUrl.includes('blogspot.com') || rawUrl.includes('googleusercontent.com')
 
     const playUrl = isDirectPlay
       ? rawUrl
-      : `/api/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent(src.url)}`
+      : `/api/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent(src.url || 'https://pixeldrain.com/')}`
 
     selectedVideo.value = {
       title: src.label,
