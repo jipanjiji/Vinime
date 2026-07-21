@@ -136,8 +136,95 @@ async function loadEpisodeData() {
   destroyHls()
 
   try {
-    const data = await $fetch(`/api/episode?slug=${encodeURIComponent(epSlug.value)}`)
-    if (data.success && data.videoSources.length > 0) {
+    // Run server scrape + client-side Kuronime hash fetch in parallel
+    const [data, hashData] = await Promise.all([
+      $fetch(`/api/episode?slug=${encodeURIComponent(epSlug.value)}`),
+      $fetch(`/api/kuronime-hash?slug=${encodeURIComponent(epSlug.value)}`).catch(() => null)
+    ])
+
+    // Merge client-side Kuronime sources if server scraping was blocked
+    const allSources = [...(data.videoSources || [])]
+
+    if (hashData?.success) {
+      // 1. Add direct HTML links (Pixeldrain, Krakenfiles extracted from page HTML)
+      for (const d of (hashData.directLinks || [])) {
+        if (!allSources.some(s => s.url === d.url)) {
+          allSources.push({
+            label: `[Kuronime Direct] ${d.mirror} (${d.quality})`,
+            url: d.url,
+            quality: d.quality
+          })
+        }
+      }
+
+      // 2. If hash available, call animeku.org API directly from browser (user's home IP — NOT blocked)
+      if (hashData.hash) {
+        try {
+          const apiRes = await fetch('https://animeku.org/api/v9/sources', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Referer': hashData.kuronimeUrl,
+              'Origin': 'https://kuronime.sbs'
+            },
+            body: JSON.stringify({ id: hashData.hash })
+          })
+
+          if (apiRes.ok) {
+            const json = await apiRes.json()
+            if (json.status === 200 && json.mirror) {
+              const { default: CryptoJS } = await import('crypto-js')
+
+              const CryptoJSAesJson = {
+                parse(jsonStr: string) {
+                  const j = JSON.parse(jsonStr)
+                  const cp = CryptoJS.lib.CipherParams.create({ ciphertext: CryptoJS.enc.Base64.parse(j.ct) })
+                  if (j.iv) cp.iv = CryptoJS.enc.Hex.parse(j.iv)
+                  if (j.s) cp.salt = CryptoJS.enc.Hex.parse(j.s)
+                  return cp
+                }
+              }
+
+              const decryptedBase64 = atob(json.mirror)
+              const decryptedBytes = CryptoJS.AES.decrypt(decryptedBase64, '3&!Z0M,VIZ;dZW==', { format: CryptoJSAesJson as any })
+              const decryptedData = JSON.parse(decryptedBytes.toString(CryptoJS.enc.Utf8))
+
+              // Add embed sources
+              const embed = decryptedData.embed || {}
+              for (const quality in embed) {
+                const servers = embed[quality]
+                const cleanQ = quality.replace(/^v/, '')
+                for (const serverName in servers) {
+                  const url = servers[serverName]
+                  if (url && !allSources.some(s => s.url === url)) {
+                    allSources.push({ label: `[Kuronime] ${serverName} (${cleanQ})`, url, quality: cleanQ })
+                  }
+                }
+              }
+
+              // Add direct download mirrors
+              const download = decryptedData.download || {}
+              for (const quality in download) {
+                const mirrors = download[quality]
+                const cleanQ = quality.replace(/^v/, '')
+                for (const mirrorName in mirrors) {
+                  const url = mirrors[mirrorName]
+                  if (url && (url.includes('pixeldrain.com') || url.includes('krakenfiles.com') || url.includes('gofile.io') || url.includes('acefile.co'))) {
+                    if (!allSources.some(s => s.url === url)) {
+                      allSources.push({ label: `[Kuronime Direct] ${mirrorName} (${cleanQ})`, url, quality: cleanQ })
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (animekuErr) {
+          console.warn('[Client] animeku.org call failed:', animekuErr)
+        }
+      }
+    }
+
+    if (allSources.length > 0) {
       parentAnime.value = data.anime
 
       if (data.anime?.episodes) {
@@ -146,7 +233,7 @@ async function loadEpisodeData() {
       }
 
       const groups = {}
-      data.videoSources.forEach(src => {
+      allSources.forEach(src => {
         const q = src.quality || 'unknown'
         if (!groups[q]) groups[q] = []
         groups[q].push(src)

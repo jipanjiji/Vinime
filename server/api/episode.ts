@@ -223,7 +223,7 @@ export default defineEventHandler(async (event) => {
 
           for (const q of uniqueQueries) {
             try {
-              const searchUrl = `https://samehadaku.email/?s=${encodeURIComponent(q)}`
+              const searchUrl = `https://v2.samehadaku.how/?s=${encodeURIComponent(q)}`
               console.log(`[Episode Engine] Searching Samehadaku fallback: ${searchUrl}`)
 
               const searchHtml = await fetchHttp2(searchUrl)
@@ -374,11 +374,13 @@ export default defineEventHandler(async (event) => {
               const $ = cheerio.load(html)
               
               let matchedAnimeLink = ''
-              $('.chldnz').slice(0, 5).each((_, el) => {
+              $('ul.chlist li, .chseries li, .chldnz').each((_, el) => {
                 const href = $(el).find('a').first().attr('href') || ''
                 const text = $(el).find('a').first().text().trim().toLowerCase()
+                const cleanQ = q.replace(/episode\s*\d+/i, '').replace(/season\s*\d+/i, '').trim().toLowerCase()
+                const firstWord = cleanQ.split(' ')[0]
                 
-                if (href && (text.includes(q) || q.includes(text))) {
+                if (href && (text.includes(cleanQ) || (firstWord && text.includes(firstWord)))) {
                   matchedAnimeLink = href
                   return false
                 }
