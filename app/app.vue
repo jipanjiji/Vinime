@@ -2,7 +2,7 @@
   <div class="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-[var(--font-sans)] flex flex-col">
 
     <!-- ===== HEADER ===== -->
-    <header class="glass-heavy border-b border-[var(--border-subtle)] sticky top-0 z-50">
+    <header class="glass-heavy border-b border-[var(--border-subtle)] sticky top-0 z-50 pt-safe-header" style="padding-top: env(safe-area-inset-top, 24px);">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
 
         <!-- Logo -->
@@ -110,11 +110,24 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from '#app'
+import { App } from '@capacitor/app'
 
 const router = useRouter()
 const headerQuery = ref('')
+
+onMounted(() => {
+  try {
+    App.addListener('backButton', ({ canGoBack }) => {
+      if (canGoBack) {
+        router.back()
+      } else {
+        App.exitApp()
+      }
+    })
+  } catch {}
+})
 
 function handleHeaderSearch() {
   if (headerQuery.value.trim()) {

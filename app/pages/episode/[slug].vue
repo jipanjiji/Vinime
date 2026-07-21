@@ -229,9 +229,25 @@ async function loadEpisodeData() {
     if (allSources.length > 0) {
       parentAnime.value = data?.anime
 
-      if (data?.anime?.episodes) {
-        const cur = data.anime.episodes.find(e => e.slug === epSlug.value)
-        currentEpisodeNumber.value = cur ? cur.episodeNumber : ''
+      if (!parentAnime.value) {
+        const deducedSlug = epSlug.value
+          .replace(/^nonton-/, '')
+          .replace(/-episode-\d+.*$/, '')
+          .replace(/-eps-\d+.*$/, '')
+        const clientAnime = await fetchClientAnimeDetail(deducedSlug)
+        if (clientAnime?.success) {
+          parentAnime.value = clientAnime
+        }
+      }
+
+      if (parentAnime.value?.episodes) {
+        const cur = parentAnime.value.episodes.find(e => e.slug === epSlug.value)
+        if (cur) {
+          currentEpisodeNumber.value = cur.episodeNumber
+        } else {
+          const matchNum = epSlug.value.match(/(?:episode|eps)-(\d+)/i)
+          if (matchNum) currentEpisodeNumber.value = matchNum[1]
+        }
       }
 
       const groups = {}
