@@ -1,9 +1,15 @@
 <script setup>
 import { ref, watch, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
-import { useRoute, useRouter } from '#app'
+import { useRoute, useRouter, useHead } from '#app'
 import Hls from 'hls.js'
 import { saveEpisodeProgress, getEpisodeProgress } from '~/utils/storage'
 import { fetchClientEpisode, resolveClientVideoUrl } from '~/utils/clientScraper'
+
+useHead({
+  meta: [
+    { name: 'referrer', content: 'no-referrer' }
+  ]
+})
 
 const route = useRoute()
 const router = useRouter()
@@ -648,6 +654,7 @@ function handleKeyDown(e) {
         <video
           id="vnime-player"
           playsinline
+          referrerpolicy="no-referrer"
           class="w-full h-full object-contain"
           @click="togglePlay"
           @timeupdate="handleTimeUpdate"
