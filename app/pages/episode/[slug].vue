@@ -882,7 +882,7 @@ function handleKeyDown(e) {
               </button>
 
               <!-- Quality dropdown -->
-              <div class="relative" v-if="availableQualities.length > 0">
+              <div class="relative" v-if="availableQualities && availableQualities.length > 0">
                 <button
                   @click="showQualityMenu = !showQualityMenu"
                   class="text-[10px] sm:text-xs font-bold px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors uppercase flex items-center gap-1"
@@ -893,7 +893,7 @@ function handleKeyDown(e) {
                 <!-- Menu -->
                 <div v-if="showQualityMenu" class="absolute bottom-10 right-0 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-xl overflow-hidden z-20 min-w-[100px] shadow-2xl shadow-black/80 anim-scale-in">
                   <button
-                    v-for="q in availableQualities"
+                    v-for="q in (availableQualities || [])"
                     :key="q"
                     @click="playResolution(q, 0)"
                     class="w-full text-left px-4 py-2.5 text-xs uppercase transition-colors font-semibold"
