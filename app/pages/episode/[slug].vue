@@ -367,7 +367,9 @@ async function playResolution(quality, hostIndex = 0) {
       rawUrl.includes('blogspot.com') || rawUrl.includes('googleusercontent.com')
 
     const playUrl = isDirectPlay
-      ? rawUrl.replace(/\?download$/, '')
+      ? (isCapacitor && rawUrl.includes('pixeldrain.com')
+        ? `https://pleasant-purpose-production-7a16.up.railway.app/api/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent('https://pixeldrain.com/')}`
+        : rawUrl.replace(/\?download$/, ''))
       : `/api/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent('https://pixeldrain.com/')}`
 
     selectedVideo.value = {
