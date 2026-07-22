@@ -75,12 +75,10 @@ const progressPercent = computed(() =>
 let hlsInstance = null
 
 const HOST_PRIORITY = [
-  'odstream',
-  'wibufile', 'filedon', 'nakama', 'krakenfiles',
+  'pixeldrain', 'krakenfiles', 'filedon', 'wibufile', 'nakama',
   'premium', 'updesu',
-  'pixeldrain',
-  'vidhide', 'vidlion',
-  'blogspot', 'mega'
+  'blogspot', 'mega',
+  'odstream', 'doodstream', 'dood', 'vidhide', 'vidlion'
 ]
 
 function getHostPriority(label) {
