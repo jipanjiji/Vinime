@@ -157,8 +157,23 @@ watch(
   }
 )
 
-function handleFullscreenChange() {
+async function handleFullscreenChange() {
   isFullscreen.value = !!document.fullscreenElement
+  if (isFullscreen.value) {
+    try {
+      await ScreenOrientation.lock({ orientation: 'landscape' })
+    } catch {
+      try {
+        if (screen.orientation && screen.orientation.lock) {
+          await screen.orientation.lock('landscape')
+        }
+      } catch {}
+    }
+  } else {
+    try {
+      await ScreenOrientation.unlock()
+    } catch {}
+  }
 }
 
 function destroyHls() {
@@ -400,6 +415,25 @@ function getSourceIndex(src) {
   return sourcesOfQuality.findIndex(s => s.url === src.url)
 }
 
+function toggleBackup(src) {
+  if (selectedVideo.value && selectedVideo.value.playUrl === src.url) {
+    const sources = qualityGroups.value[src.quality] || []
+    const rawIndex = sources.findIndex(s => !s.isIframe)
+    if (rawIndex !== -1) {
+      playResolution(src.quality, rawIndex, false)
+    } else {
+      const rawSource = videoSources.value.find(s => !s.isIframe)
+      if (rawSource) {
+        const qSources = qualityGroups.value[rawSource.quality] || []
+        const qIdx = qSources.findIndex(s => s.url === rawSource.url)
+        playResolution(rawSource.quality, qIdx, false)
+      }
+    }
+  } else {
+    playResolution(src.quality, getSourceIndex(src), false)
+  }
+}
+
 async function playResolution(quality, hostIndex = 0, isAutoFailover = true) {
   const sources = qualityGroups.value[quality]
   if (!sources || sources.length === 0) return
@@ -472,6 +506,9 @@ async function playResolution(quality, hostIndex = 0, isAutoFailover = true) {
     )
 
     const isDirectPlay = isCapacitor ||
+      rawUrl.includes('pixeldrain.com') ||
+      rawUrl.includes('krakenfiles.com') ||
+      rawUrl.includes('gofile.io') ||
       rawUrl.includes('wibufile.com') || rawUrl.includes('archive.org') ||
       rawUrl.includes('cloudflarestorage.com') || rawUrl.includes('filedon.co') ||
       rawUrl.includes('googlevideo.com') || rawUrl.includes('blogger.com') ||
@@ -699,24 +736,10 @@ async function toggleFullscreen() {
         await document.exitFullscreen()
       }
     } catch {}
-    isFullscreen.value = false
-    try {
-      await ScreenOrientation.unlock()
-    } catch {}
   } else {
     try {
       await c.requestFullscreen()
     } catch {}
-    isFullscreen.value = true
-    try {
-      await ScreenOrientation.lock({ orientation: 'landscape' })
-    } catch {
-      try {
-        if (screen.orientation && screen.orientation.lock) {
-          await screen.orientation.lock('landscape')
-        }
-      } catch {}
-    }
   }
 }
 
@@ -1014,7 +1037,7 @@ function handleKeyDown(e) {
             <button
               v-for="(src, q) in backupSources"
               :key="q"
-              @click="playResolution(src.quality, getSourceIndex(src), false)"
+              @click="toggleBackup(src)"
               class="px-4 py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 active:scale-95 cursor-pointer uppercase font-extrabold"
               :class="selectedVideo && selectedVideo.playUrl === src.url
                 ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md shadow-[var(--accent-glow)] scale-105'
