@@ -525,6 +525,24 @@ export async function fetchClientEpisode(epSlug: string) {
             const decryptedBytes = CryptoJS.AES.decrypt(decryptedBase64, '3&!Z0M,VIZ;dZW==', { format: CryptoJSAesJson })
             const decryptedData = JSON.parse(decryptedBytes.toString(CryptoJS.enc.Utf8))
 
+            // Extract embeds
+            const embed = decryptedData.embed || {}
+            for (const quality in embed) {
+              const servers = embed[quality]
+              const cleanQ = quality.replace(/^v/, '')
+              for (const serverName in servers) {
+                const url = servers[serverName]
+                if (url) {
+                  videoSources.push({
+                    label: `[Kuronime] ${serverName} (${cleanQ})`,
+                    url,
+                    quality: cleanQ,
+                    isIframe: true
+                  })
+                }
+              }
+            }
+
             const download = decryptedData.download || {}
             for (const quality in download) {
               const mirrors = download[quality]

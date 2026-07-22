@@ -199,7 +199,7 @@ async function loadEpisodeData() {
                 for (const serverName in servers) {
                   const url = servers[serverName]
                   if (url && !allSources.some(s => s.url === url)) {
-                    allSources.push({ label: `[Kuronime] ${serverName} (${cleanQ})`, url, quality: cleanQ })
+                    allSources.push({ label: `[Kuronime] ${serverName} (${cleanQ})`, url, quality: cleanQ, isIframe: true })
                   }
                 }
               }
@@ -322,7 +322,17 @@ async function playResolution(quality, hostIndex = 0) {
   errorMsg.value = ''
   destroyHls()
   selectedVideo.value = null
-  showQualityMenu.value = false
+  if (src.isIframe) {
+    selectedVideo.value = {
+      title: src.label,
+      quality,
+      playUrl: src.url,
+      isIframe: true,
+      isHls: false
+    }
+    isResolving.value = false
+    return
+  }
 
   try {
     let resolveData = await $fetch(`/api/resolve?url=${encodeURIComponent(src.url)}`).catch(() => null)
@@ -370,6 +380,7 @@ async function playResolution(quality, hostIndex = 0) {
     isResolving.value = false
 
     nextTick(() => {
+      if (selectedVideo.value?.isIframe) return
       const videoEl = document.getElementById('vnime-player')
       if (!videoEl) return
 
@@ -681,8 +692,18 @@ function handleKeyDown(e) {
           <button @click="loadEpisodeData" class="mt-1 px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-xs font-bold text-white rounded-xl transition-colors">Coba Lagi</button>
         </div>
 
+        <!-- Iframe Embed Video Player (for Otakudesu / Embed sources) -->
+        <iframe
+          v-if="selectedVideo && selectedVideo.isIframe"
+          :src="selectedVideo.playUrl"
+          class="w-full h-full border-0 z-10 relative"
+          allowfullscreen
+          allow="autoplay; encrypted-media; picture-in-picture"
+        ></iframe>
+
         <!-- Native HTML5 Video Element (for Pixeldrain / Krakenfiles / MP4 / HLS streams) -->
         <video
+          v-else
           id="vnime-player"
           playsinline
           referrerpolicy="no-referrer"
@@ -704,6 +725,7 @@ function handleKeyDown(e) {
 
         <!-- ===== TOP-LEFT ANIME & EPISODE INFO OVERLAY ===== -->
         <div
+          v-if="selectedVideo && !selectedVideo.isIframe"
           class="absolute top-4 left-4 sm:top-5 sm:left-6 z-10 transition-opacity duration-300 pointer-events-none"
           :class="(showControls || !isPlaying) && selectedVideo ? 'opacity-100' : 'opacity-0'"
         >
@@ -717,7 +739,7 @@ function handleKeyDown(e) {
 
         <!-- ===== CENTER CONTROLS OVERLAY ===== -->
         <div
-          v-if="!isBuffering && !isResolving && selectedVideo"
+          v-if="!isBuffering && !isResolving && selectedVideo && !selectedVideo.isIframe"
           class="absolute inset-0 flex items-center justify-center gap-3 sm:gap-7 z-10 transition-opacity duration-300"
           :class="(showControls || !isPlaying) ? 'opacity-100' : 'opacity-0 pointer-events-none'"
         >
@@ -788,6 +810,7 @@ function handleKeyDown(e) {
 
         <!-- ===== BOTTOM CONTROL BAR ===== -->
         <div
+          v-if="selectedVideo && !selectedVideo.isIframe"
           class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent px-3 sm:px-5 pb-3 sm:pb-4 pt-14 flex flex-col gap-2 transition-opacity duration-300 z-10"
           :class="(showControls || !isPlaying) && selectedVideo ? 'opacity-100' : 'opacity-0 pointer-events-none'"
         >
