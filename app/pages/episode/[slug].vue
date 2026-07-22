@@ -171,12 +171,13 @@ async function loadEpisodeData() {
   destroyHls()
 
   try {
-    // Run server scrape, client-side Kuronime hash fetch, client-side bypassed scrape, and server-side Samehadaku scrape in parallel
-    const [data, hashData, clientResult, samehadakuData] = await Promise.all([
+    // Run all scrapers in parallel: server-side episode, kuronime-hash, client-side bypass, Samehadaku server-side, Otakudesu server-side
+    const [data, hashData, clientResult, samehadakuData, otakudesuData] = await Promise.all([
       $fetch(`/api/episode?slug=${encodeURIComponent(epSlug.value)}`).catch(() => null),
       $fetch(`/api/kuronime-hash?slug=${encodeURIComponent(epSlug.value)}`).catch(() => null),
       fetchClientEpisode(epSlug.value).catch(() => null),
-      $fetch(`/api/samehadaku-episode?slug=${encodeURIComponent(epSlug.value)}`).catch(() => null)
+      $fetch(`/api/samehadaku-episode?slug=${encodeURIComponent(epSlug.value)}`).catch(() => null),
+      $fetch(`/api/otakudesu-episode?slug=${encodeURIComponent(epSlug.value)}`).catch(() => null)
     ])
 
     // Merge server-side sources and determine isIframe flag
@@ -198,6 +199,15 @@ async function loadEpisodeData() {
     // Merge server-side Samehadaku sources (works on HP without CORS bypass)
     if (samehadakuData?.success) {
       for (const src of samehadakuData.videoSources) {
+        if (!allSources.some(s => s.url === src.url)) {
+          allSources.push(src)
+        }
+      }
+    }
+
+    // Merge server-side Otakudesu sources (works on HP without CORS bypass)
+    if (otakudesuData?.success) {
+      for (const src of otakudesuData.videoSources) {
         if (!allSources.some(s => s.url === src.url)) {
           allSources.push(src)
         }
