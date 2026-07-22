@@ -55,6 +55,22 @@ const nextEpisode = computed(() => {
   }
   return null
 })
+const backupSources = computed(() => {
+  const result = {}
+  videoSources.value.forEach(src => {
+    if (src.isIframe) {
+      const q = src.quality || 'unknown'
+      if (!result[q]) {
+        result[q] = src
+      } else {
+        if (getHostPriority(src.label) < getHostPriority(result[q].label)) {
+          result[q] = src
+        }
+      }
+    }
+  })
+  return result
+})
 
 // Custom player states
 const isPlaying = ref(false)
@@ -987,25 +1003,25 @@ function handleKeyDown(e) {
         </div>
       </div>
 
-      <!-- ===== SERVER / MIRROR SELECTOR ===== -->
-      <div v-if="videoSources.length > 0" class="mt-4 anim-fade-up anim-delay-1">
+      <!-- ===== BACKUP PLAYERS SELECTOR ===== -->
+      <div v-if="Object.keys(backupSources).length > 0" class="mt-4 anim-fade-up anim-delay-1">
         <div class="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl p-4 space-y-3">
           <div class="flex items-center gap-2">
             <svg class="w-4 h-4 text-[var(--accent)]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3V7.5a3 3 0 013-3h13.5a3 3 0 013 3v3.75a3 3 0 01-3 3zm-13.5 0a3 3 0 00-3 3v3.75a3 3 0 003 3h13.5a3 3 0 003-3V17.25a3 3 0 00-3-3z"/></svg>
-            <h3 class="text-xs sm:text-sm font-bold text-white">Pilih Server / Mirror</h3>
+            <h3 class="text-xs sm:text-sm font-bold text-white">Server Cadangan (Backup Player)</h3>
           </div>
-          <div class="flex flex-wrap gap-2">
+          <div class="flex flex-wrap gap-2.5">
             <button
-              v-for="(src, idx) in videoSources"
-              :key="idx"
+              v-for="(src, q) in backupSources"
+              :key="q"
               @click="playResolution(src.quality, getSourceIndex(src), false)"
-              class="px-3 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 active:scale-95 cursor-pointer"
+              class="px-4 py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 active:scale-95 cursor-pointer uppercase font-extrabold"
               :class="selectedVideo && selectedVideo.playUrl === src.url
                 ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md shadow-[var(--accent-glow)] scale-105'
                 : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:text-white hover:border-white/20'"
             >
-              <span class="w-1.5 h-1.5 rounded-full" :class="src.isIframe ? 'bg-amber-400' : 'bg-emerald-400'"></span>
-              {{ src.label }}
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+              Backup {{ q }}
             </button>
           </div>
         </div>
