@@ -568,128 +568,126 @@ export async function fetchClientEpisode(epSlug: string) {
   }
 
   // 3. Direct raw streams and player options from Samehadaku
-  if (videoSources.length === 0) {
-    const samehadakuUrls = [
-      `https://v2.samehadaku.how/${cleanSlug}/`,
-      `https://v2.samehadaku.how/${cleanSlug}-sub-indo/`
-    ]
+  const samehadakuUrls = [
+    `https://v2.samehadaku.how/${cleanSlug}/`,
+    `https://v2.samehadaku.how/${cleanSlug}-sub-indo/`
+  ]
 
-    for (const shUrl of samehadakuUrls) {
-      try {
-        const res = await fetch(shUrl, { headers: CHROME_HEADERS })
-        if (!res.ok) continue
-        const html = await res.text()
-        const $ep = cheerio.load(html)
+  for (const shUrl of samehadakuUrls) {
+    try {
+      const res = await fetch(shUrl, { headers: CHROME_HEADERS })
+      if (!res.ok) continue
+      const html = await res.text()
+      const $ep = cheerio.load(html)
 
-        // A. Extract player options
-        const options: Array<{ label: string; post: string; nume: string; type: string }> = []
-        $ep('.east_player_option').each((_, el) => {
-          const label = $ep(el).text().trim()
-          const post = $ep(el).attr('data-post')
-          const nume = $ep(el).attr('data-nume')
-          const type = $ep(el).attr('data-type')
-          if (post && nume && type) {
-            options.push({ label, post, nume, type })
-          }
-        })
+      // A. Extract player options
+      const options: Array<{ label: string; post: string; nume: string; type: string }> = []
+      $ep('.east_player_option').each((_, el) => {
+        const label = $ep(el).text().trim()
+        const post = $ep(el).attr('data-post')
+        const nume = $ep(el).attr('data-nume')
+        const type = $ep(el).attr('data-type')
+        if (post && nume && type) {
+          options.push({ label, post, nume, type })
+        }
+      })
 
-        const parsedOrigin = new URL(shUrl).origin
-        const ajaxUrl = `${parsedOrigin}/wp-admin/admin-ajax.php`
+      const parsedOrigin = new URL(shUrl).origin
+      const ajaxUrl = `${parsedOrigin}/wp-admin/admin-ajax.php`
 
-        await Promise.all(
-          options.map(async (opt) => {
-            try {
-              const payload = new URLSearchParams()
-              payload.append('action', 'player_ajax')
-              payload.append('post', opt.post)
-              payload.append('nume', opt.nume)
-              payload.append('type', opt.type)
+      await Promise.all(
+        options.map(async (opt) => {
+          try {
+            const payload = new URLSearchParams()
+            payload.append('action', 'player_ajax')
+            payload.append('post', opt.post)
+            payload.append('nume', opt.nume)
+            payload.append('type', opt.type)
 
-              const ajaxRes = await fetch(ajaxUrl, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/x-www-form-urlencoded',
-                  'Referer': shUrl,
-                  'X-Requested-With': 'XMLHttpRequest',
-                  ...CHROME_HEADERS
-                },
-                body: payload.toString()
-              })
+            const ajaxRes = await fetch(ajaxUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Referer': shUrl,
+                'X-Requested-With': 'XMLHttpRequest',
+                ...CHROME_HEADERS
+              },
+              body: payload.toString()
+            })
 
-              if (ajaxRes.ok) {
-                const ajaxResponse = await ajaxRes.text()
-                let iframeSrc: string | null = null
+            if (ajaxRes.ok) {
+              const ajaxResponse = await ajaxRes.text()
+              let iframeSrc: string | null = null
 
-                const shortcodeMatch = ajaxResponse.match(/\[(\w+)\s+id=["']?([a-zA-Z0-9_-]+)["']?\]/)
-                if (shortcodeMatch) {
-                  const codeName = shortcodeMatch[1].toLowerCase()
-                  const codeId = shortcodeMatch[2]
-                  if (codeName === 'vidlion' || codeName === 'vidhide') {
-                    iframeSrc = `https://vidhidepro.com/v/${codeId}`
-                  }
-                } else {
-                  const $iframe = cheerio.load(ajaxResponse)
-                  iframeSrc = $iframe('iframe').attr('src') || null
+              const shortcodeMatch = ajaxResponse.match(/\[(\w+)\s+id=["']?([a-zA-Z0-9_-]+)["']?\]/)
+              if (shortcodeMatch) {
+                const codeName = shortcodeMatch[1].toLowerCase()
+                const codeId = shortcodeMatch[2]
+                if (codeName === 'vidlion' || codeName === 'vidhide') {
+                  iframeSrc = `https://vidhidepro.com/v/${codeId}`
                 }
-
-                if (iframeSrc) {
-                  let quality = 'unknown'
-                  const qualityMatch = opt.label.match(/(\d+p|4k)/i)
-                  if (qualityMatch) quality = qualityMatch[1].toLowerCase()
-
-                  const serverName = opt.label.replace(/\s*(\d+p|4k)/i, '').trim()
-                  const isEmbedIframe = !iframeSrc.includes('wibufile') && !iframeSrc.includes('pixeldrain') && !iframeSrc.includes('krakenfiles') && !iframeSrc.includes('gofile')
-
-                  videoSources.push({
-                    label: `[Samehadaku] ${serverName} (${quality})`,
-                    url: iframeSrc,
-                    quality,
-                    isIframe: isEmbedIframe
-                  })
-                }
+              } else {
+                const $iframe = cheerio.load(ajaxResponse)
+                iframeSrc = $iframe('iframe').attr('src') || null
               }
-            } catch (err) {
-              console.warn('[Client Scraper] Samehadaku ajax error:', err)
-            }
-          })
-        )
 
-        // B. Extract download links
-        $ep('.download-link ul li, .download-eps li, .sda_download li').each((_, el) => {
-          let quality = 'unknown'
-          const strongText = $ep(el).find('strong').text().trim()
-          const qualityMatch = strongText.match(/(\d+p|4k)/i)
-          if (qualityMatch) {
-            quality = qualityMatch[1].toLowerCase()
-          }
+              if (iframeSrc) {
+                let quality = 'unknown'
+                const qualityMatch = opt.label.match(/(\d+p|4k)/i)
+                if (qualityMatch) quality = qualityMatch[1].toLowerCase()
 
-          $ep(el).find('a').each((__, aEl) => {
-            const href = $ep(aEl).attr('href') || ''
-            const label = $ep(aEl).text().trim()
-            
-            if (href && (href.includes('krakenfiles.com') || href.includes('pixeldrain.com') || href.includes('gofile.io') || href.includes('acefile.co') || href.includes('wibufile'))) {
-              let mirrorName = label || 'Download Mirror'
-              if (href.includes('krakenfiles.com')) mirrorName = 'Krakenfiles'
-              else if (href.includes('pixeldrain.com')) mirrorName = 'Pixeldrain'
-              else if (href.includes('gofile.io')) mirrorName = 'Gofile'
-              else if (href.includes('acefile.co')) mirrorName = 'Acefile'
-              else if (href.includes('wibufile')) mirrorName = 'Wibufile'
+                const serverName = opt.label.replace(/\s*(\d+p|4k)/i, '').trim()
+                const isEmbedIframe = !iframeSrc.includes('wibufile') && !iframeSrc.includes('pixeldrain') && !iframeSrc.includes('krakenfiles') && !iframeSrc.includes('gofile')
 
-              if (!videoSources.some(v => v.url === href)) {
                 videoSources.push({
-                  label: `[Samehadaku Direct] ${mirrorName} (${quality})`,
-                  url: href,
-                  quality
+                  label: `[Samehadaku] ${serverName} (${quality})`,
+                  url: iframeSrc,
+                  quality,
+                  isIframe: isEmbedIframe
                 })
               }
             }
-          })
+          } catch (err) {
+            console.warn('[Client Scraper] Samehadaku ajax error:', err)
+          }
         })
+      )
 
-        if (videoSources.length > 0) break
-      } catch (err) {
-        console.warn('[Client Scraper] Samehadaku episode error:', err)
-      }
+      // B. Extract download links
+      $ep('.download-link ul li, .download-eps li, .sda_download li').each((_, el) => {
+        let quality = 'unknown'
+        const strongText = $ep(el).find('strong').text().trim()
+        const qualityMatch = strongText.match(/(\d+p|4k)/i)
+        if (qualityMatch) {
+          quality = qualityMatch[1].toLowerCase()
+        }
+
+        $ep(el).find('a').each((__, aEl) => {
+          const href = $ep(aEl).attr('href') || ''
+          const label = $ep(aEl).text().trim()
+          
+          if (href && (href.includes('krakenfiles.com') || href.includes('pixeldrain.com') || href.includes('gofile.io') || href.includes('acefile.co') || href.includes('wibufile'))) {
+            let mirrorName = label || 'Download Mirror'
+            if (href.includes('krakenfiles.com')) mirrorName = 'Krakenfiles'
+            else if (href.includes('pixeldrain.com')) mirrorName = 'Pixeldrain'
+            else if (href.includes('gofile.io')) mirrorName = 'Gofile'
+            else if (href.includes('acefile.co')) mirrorName = 'Acefile'
+            else if (href.includes('wibufile')) mirrorName = 'Wibufile'
+
+            if (!videoSources.some(v => v.url === href)) {
+              videoSources.push({
+                label: `[Samehadaku Direct] ${mirrorName} (${quality})`,
+                url: href,
+                quality
+              })
+            }
+          }
+        })
+      })
+
+      if (videoSources.length > 0) break
+    } catch (err) {
+      console.warn('[Client Scraper] Samehadaku episode error:', err)
     }
   }
 
