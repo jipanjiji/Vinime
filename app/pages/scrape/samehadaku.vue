@@ -1,5 +1,6 @@
 <script setup>
 import { ref, nextTick } from 'vue'
+import { scrapeSamehadakuClient } from '~/utils/clientScraper'
 
 const targetUrl = ref('')
 const isLoading = ref(false)
@@ -27,6 +28,19 @@ async function handleScrape() {
   playUrl.value = ''
   destroyHls()
 
+  try {
+    // 1. Try client-side scrape first (supports direct bypass on Android/Capacitor)
+    const clientData = await scrapeSamehadakuClient(targetUrl.value)
+    if (clientData?.success && clientData.videoSources?.length > 0) {
+      sources.value = clientData.videoSources
+      isLoading.value = false
+      return
+    }
+  } catch (clientErr) {
+    console.warn('Client-side Samehadaku scrape failed (CORS if on localhost):', clientErr)
+  }
+
+  // 2. Fallback to server-side API
   try {
     const data = await $fetch(`/api/scrape/samehadaku?url=${encodeURIComponent(targetUrl.value)}`)
     if (data.success) {
