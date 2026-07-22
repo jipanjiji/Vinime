@@ -364,8 +364,7 @@ async function playResolution(quality, hostIndex = 0) {
       rawUrl.includes('wibufile.com') || rawUrl.includes('archive.org') ||
       rawUrl.includes('cloudflarestorage.com') || rawUrl.includes('filedon.co') ||
       rawUrl.includes('googlevideo.com') || rawUrl.includes('blogger.com') ||
-      rawUrl.includes('blogspot.com') || rawUrl.includes('googleusercontent.com') ||
-      rawUrl.includes('pixeldrain.com')
+      rawUrl.includes('blogspot.com') || rawUrl.includes('googleusercontent.com')
 
     const playUrl = isDirectPlay
       ? rawUrl.replace(/\?download$/, '')
