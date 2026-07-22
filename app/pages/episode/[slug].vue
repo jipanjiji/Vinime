@@ -21,6 +21,7 @@ const isResolving = ref(true)
 const errorMsg = ref('')
 const selectedVideo = ref(null)
 const qualityGroups = ref({})
+const videoSources = ref([])
 const availableQualities = ref([])
 const selectedQuality = ref('')
 const currentHostIndex = ref(0)
@@ -129,6 +130,7 @@ async function loadEpisodeData() {
   errorMsg.value = ''
   selectedVideo.value = null
   qualityGroups.value = {}
+  videoSources.value = []
   availableQualities.value = []
   selectedQuality.value = ''
   currentHostIndex.value = 0
