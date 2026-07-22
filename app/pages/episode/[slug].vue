@@ -349,7 +349,7 @@ function getSourceIndex(src) {
   return sourcesOfQuality.findIndex(s => s.url === src.url)
 }
 
-async function playResolution(quality, hostIndex = 0) {
+async function playResolution(quality, hostIndex = 0, isAutoFailover = true) {
   const sources = qualityGroups.value[quality]
   if (!sources || sources.length === 0) return
 
@@ -359,7 +359,7 @@ async function playResolution(quality, hostIndex = 0) {
     if (qIndex > 0) {
       const nextQuality = availableQualities.value[qIndex - 1]
       console.info(`[Failover Engine] Falling back to lower quality: ${nextQuality}`)
-      playResolution(nextQuality, 0)
+      playResolution(nextQuality, 0, isAutoFailover)
     } else {
       errorMsg.value = `Gagal memutar video. Semua server cermin offline.`
       isResolving.value = false
@@ -370,6 +370,12 @@ async function playResolution(quality, hostIndex = 0) {
   }
 
   const src = sources[hostIndex]
+  if (src.isIframe && isAutoFailover) {
+    console.info(`[Failover Engine] Skipping iframe source during auto-failover: ${src.label}`)
+    playResolution(quality, hostIndex + 1, true)
+    return
+  }
+
   currentHostIndex.value = hostIndex
   selectedQuality.value = quality
   isResolving.value = true
@@ -403,7 +409,7 @@ async function playResolution(quality, hostIndex = 0) {
     }
 
     if (!resolveData?.success || !resolveData.rawVideoUrl) {
-      playResolution(quality, hostIndex + 1)
+      playResolution(quality, hostIndex + 1, isAutoFailover)
       return
     }
 
@@ -481,7 +487,7 @@ async function playResolution(quality, hostIndex = 0) {
           hlsInstance.on(Hls.Events.ERROR, (_, data) => {
             if (data.fatal) {
               destroyHls()
-              playResolution(quality, hostIndex + 1)
+              playResolution(quality, hostIndex + 1, isAutoFailover)
             }
           })
         } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
@@ -493,7 +499,7 @@ async function playResolution(quality, hostIndex = 0) {
         videoEl.onerror = null
         videoEl.onerror = () => {
           videoEl.onerror = null
-          playResolution(quality, hostIndex + 1)
+          playResolution(quality, hostIndex + 1, isAutoFailover)
         }
         videoEl.src = playUrl
         videoEl.load()
@@ -506,7 +512,7 @@ async function playResolution(quality, hostIndex = 0) {
       }
     })
   } catch {
-    playResolution(quality, hostIndex + 1)
+    playResolution(quality, hostIndex + 1, isAutoFailover)
   }
 }
 
@@ -957,7 +963,7 @@ function handleKeyDown(e) {
             <button
               v-for="(src, idx) in videoSources"
               :key="idx"
-              @click="playResolution(src.quality, getSourceIndex(src))"
+              @click="playResolution(src.quality, getSourceIndex(src), false)"
               class="px-3 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 active:scale-95 cursor-pointer"
               :class="selectedVideo && selectedVideo.playUrl === src.url
                 ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md shadow-[var(--accent-glow)] scale-105'
