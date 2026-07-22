@@ -38,11 +38,11 @@ export default defineEventHandler(async (event) => {
       const title = $(el).find('.bsuxtt h2').text().trim() || $(el).find('h2').text().trim() || linkEl.attr('title')?.replace(/\s*subtitle\s*indonesia/i, '').trim() || 'Anime'
       const cover = $(el).find('img[itemprop="image"]').attr('src') || 
                     $(el).find('img:not(.dashicons-controls-play)').first().attr('src') || ''
-      const rawScore = $(el).find('.numscore').text().trim() || $(el).find('.rating .num').text().trim() || $(el).find('.rating').text().trim() || ''
-      const scoreMatch = rawScore.match(/(\d+\.?\d*)/)
+      const scoreVal = $(el).find('.rating i').text().trim() || $(el).find('.numscore').text().trim() || ''
+      const scoreMatch = scoreVal.match(/(\d+\.?\d*)/)
       const score = scoreMatch ? scoreMatch[1] : '0.0'
       const type = $(el).find('.typez').text().trim() || 'TV'
-      const status = $(el).find('.ep').text().trim() || 'Completed'
+      const status = $(el).find('.ep').text().trim() || ''
       const synopsis = $(el).find('.entry-content p, .sinopsis p').text().trim() || ''
 
       if (href) {

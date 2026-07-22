@@ -148,8 +148,21 @@ async function loadEpisodeData() {
       $fetch(`/api/kuronime-hash?slug=${encodeURIComponent(epSlug.value)}`).catch(() => null)
     ])
 
-    // Merge client-side Kuronime sources if server scraping was blocked
-    const allSources = [...(data?.videoSources || [])]
+    // Merge client-side sources and determine isIframe flag
+    const allSources = (data?.videoSources || []).map(s => {
+      const url = s.url || ''
+      const isDirect = url.includes('pixeldrain.com') ||
+                       url.includes('krakenfiles.com') ||
+                       url.includes('gofile.io') ||
+                       url.includes('acefile.co') ||
+                       url.includes('wibufile.com') ||
+                       url.endsWith('.mp4') ||
+                       url.includes('.m3u8')
+      return {
+        ...s,
+        isIframe: s.isIframe !== undefined ? s.isIframe : !isDirect
+      }
+    })
 
     if (hashData?.success) {
       // 1. Add direct HTML links (Pixeldrain, Krakenfiles extracted from page HTML)
@@ -747,8 +760,7 @@ function handleKeyDown(e) {
           v-if="!isBuffering && !isResolving && selectedVideo && !selectedVideo.isIframe"
           class="absolute inset-0 flex items-center justify-center gap-3 sm:gap-7 z-10 transition-opacity duration-300"
           :class="(showControls || !isPlaying) ? 'opacity-100' : 'opacity-0 pointer-events-none'"
-        >
-          <!-- 1. Previous Episode -->
+                   <!-- 1. Previous Episode -->
           <NuxtLink
             v-if="prevEpisode"
             :to="`/episode/${prevEpisode.slug}`"
@@ -762,6 +774,10 @@ function handleKeyDown(e) {
               Episode {{ prevEpisode.episodeNumber }}
             </span>
           </NuxtLink>
+          <div v-else class="flex flex-col items-center gap-1 opacity-0 pointer-events-none select-none" aria-hidden="true">
+            <div class="w-10 h-10 sm:w-13 sm:h-13 rounded-full border border-transparent"></div>
+            <span class="text-[10px] sm:text-xs font-bold">Eps 00</span>
+          </div>
 
           <!-- 2. Rewind 10s (CLEAN SVG WITHOUT COLLISION) -->
           <button
@@ -811,6 +827,10 @@ function handleKeyDown(e) {
               Episode {{ nextEpisode.episodeNumber }}
             </span>
           </NuxtLink>
+          <div v-else class="flex flex-col items-center gap-1 opacity-0 pointer-events-none select-none" aria-hidden="true">
+            <div class="w-10 h-10 sm:w-13 sm:h-13 rounded-full border border-transparent"></div>
+            <span class="text-[10px] sm:text-xs font-bold">Eps 00</span>
+          </div>
         </div>
 
         <!-- ===== BOTTOM CONTROL BAR ===== -->

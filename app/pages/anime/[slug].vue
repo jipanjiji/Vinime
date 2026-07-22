@@ -169,16 +169,16 @@ function cleanTitle(t) {
               </div>
 
               <!-- ===== PLAY & SUBSCRIBE ACTION BUTTONS ===== -->
-              <div class="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-2">
-                <!-- Play / Resume Button -->
-                <div class="flex flex-col items-center sm:items-start">
+              <div class="flex flex-col items-center sm:items-start gap-2 pt-2">
+                <div class="flex flex-wrap items-center justify-center sm:justify-start gap-3">
+                  <!-- Play / Resume Button -->
                   <NuxtLink
                     v-if="watchHistory && watchHistory.lastEpisodeSlug"
                     :to="`/episode/${watchHistory.lastEpisodeSlug}?t=${watchHistory.lastTime}`"
                     class="px-6 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white text-sm font-extrabold flex items-center gap-2 transition-all shadow-lg shadow-sky-500/20 active:scale-95"
                   >
                     <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                    <span>Lanjut Eps {{ watchHistory.lastEpisodeNumber }}</span>
+                    <span>Lanjut Nonton Eps {{ watchHistory.lastEpisodeNumber }}</span>
                   </NuxtLink>
 
                   <NuxtLink
@@ -190,24 +190,24 @@ function cleanTitle(t) {
                     <span>Mulai Nonton</span>
                   </NuxtLink>
 
-                  <!-- Time subtext -->
-                  <span v-if="watchHistory && watchHistory.lastTime" class="text-[11px] text-[var(--text-muted)] font-medium mt-1">
-                    · {{ formatSeconds(watchHistory.lastTime) }} / {{ formatSeconds(watchHistory.duration) }} ·
-                  </span>
+                  <!-- Subscribe Button -->
+                  <button
+                    @click="handleToggleSubscribe"
+                    class="px-5 py-3 rounded-2xl border text-sm font-bold flex items-center gap-2 transition-all active:scale-95 shadow-md"
+                    :class="subscribed
+                      ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 hover:bg-amber-500/20'
+                      : 'bg-white/10 border-white/20 text-white hover:bg-white/15'"
+                  >
+                    <svg v-if="subscribed" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+                    <svg v-else class="w-4 h-4 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"/></svg>
+                    <span>{{ subscribed ? 'Subscribed' : 'Subscribe' }}</span>
+                  </button>
                 </div>
 
-                <!-- Subscribe Button -->
-                <button
-                  @click="handleToggleSubscribe"
-                  class="px-5 py-3 rounded-2xl border text-sm font-bold flex items-center gap-2 transition-all active:scale-95 shadow-md"
-                  :class="subscribed
-                    ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 hover:bg-amber-500/20'
-                    : 'bg-white/10 border-white/20 text-white hover:bg-white/15'"
-                >
-                  <svg v-if="subscribed" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
-                  <svg v-else class="w-4 h-4 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"/></svg>
-                  <span>{{ subscribed ? 'Subscribed' : 'Subscribe' }}</span>
-                </button>
+                <!-- Time subtext -->
+                <span v-if="watchHistory && watchHistory.lastTime" class="text-[11px] text-[var(--text-muted)] font-medium mt-0.5 ml-1">
+                  Terakhir ditonton: {{ formatSeconds(watchHistory.lastTime) }} / {{ formatSeconds(watchHistory.duration) }}
+                </span>
               </div>
 
               <!-- Synopsis -->

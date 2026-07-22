@@ -283,11 +283,11 @@ export async function fetchClientSearch(q: string) {
       const title = $(el).find('.bsuxtt h2').text().trim() || $(el).find('h2').text().trim() || linkEl.attr('title')?.replace(/\s*subtitle\s*indonesia/i, '').trim() || 'Anime'
       const cover = $(el).find('img[itemprop="image"]').attr('src') ||
                     $(el).find('img:not(.dashicons-controls-play)').first().attr('src') || ''
-      const rawScore = $(el).find('.numscore').text().trim() || $(el).find('.rating .num').text().trim() || $(el).find('.rating').text().trim() || ''
-      const scoreMatch = rawScore.match(/(\d+\.?\d*)/)
+      const scoreVal = $(el).find('.rating i').text().trim() || $(el).find('.numscore').text().trim() || ''
+      const scoreMatch = scoreVal.match(/(\d+\.?\d*)/)
       const score = scoreMatch ? scoreMatch[1] : '0.0'
       const type = $(el).find('.typez').text().trim() || 'TV'
-      const status = $(el).find('.ep').text().trim() || 'Completed'
+      const status = $(el).find('.ep').text().trim() || ''
       const synopsis = $(el).find('.entry-content p, .sinopsis p').text().trim() || ''
 
       if (href) {
@@ -564,6 +564,132 @@ export async function fetchClientEpisode(epSlug: string) {
       if (videoSources.length > 0) break
     } catch (err) {
       console.warn('[Client Scraper] Kuronime episode error:', err)
+    }
+  }
+
+  // 3. Direct raw streams and player options from Samehadaku
+  if (videoSources.length === 0) {
+    const samehadakuUrls = [
+      `https://v2.samehadaku.how/${cleanSlug}/`,
+      `https://v2.samehadaku.how/${cleanSlug}-sub-indo/`
+    ]
+
+    for (const shUrl of samehadakuUrls) {
+      try {
+        const res = await fetch(shUrl, { headers: CHROME_HEADERS })
+        if (!res.ok) continue
+        const html = await res.text()
+        const $ep = cheerio.load(html)
+
+        // A. Extract player options
+        const options: Array<{ label: string; post: string; nume: string; type: string }> = []
+        $ep('.east_player_option').each((_, el) => {
+          const label = $ep(el).text().trim()
+          const post = $ep(el).attr('data-post')
+          const nume = $ep(el).attr('data-nume')
+          const type = $ep(el).attr('data-type')
+          if (post && nume && type) {
+            options.push({ label, post, nume, type })
+          }
+        })
+
+        const parsedOrigin = new URL(shUrl).origin
+        const ajaxUrl = `${parsedOrigin}/wp-admin/admin-ajax.php`
+
+        await Promise.all(
+          options.map(async (opt) => {
+            try {
+              const payload = new URLSearchParams()
+              payload.append('action', 'player_ajax')
+              payload.append('post', opt.post)
+              payload.append('nume', opt.nume)
+              payload.append('type', opt.type)
+
+              const ajaxRes = await fetch(ajaxUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                  'Referer': shUrl,
+                  'X-Requested-With': 'XMLHttpRequest',
+                  ...CHROME_HEADERS
+                },
+                body: payload.toString()
+              })
+
+              if (ajaxRes.ok) {
+                const ajaxResponse = await ajaxRes.text()
+                let iframeSrc: string | null = null
+
+                const shortcodeMatch = ajaxResponse.match(/\[(\w+)\s+id=["']?([a-zA-Z0-9_-]+)["']?\]/)
+                if (shortcodeMatch) {
+                  const codeName = shortcodeMatch[1].toLowerCase()
+                  const codeId = shortcodeMatch[2]
+                  if (codeName === 'vidlion' || codeName === 'vidhide') {
+                    iframeSrc = `https://vidhidepro.com/v/${codeId}`
+                  }
+                } else {
+                  const $iframe = cheerio.load(ajaxResponse)
+                  iframeSrc = $iframe('iframe').attr('src') || null
+                }
+
+                if (iframeSrc) {
+                  let quality = 'unknown'
+                  const qualityMatch = opt.label.match(/(\d+p|4k)/i)
+                  if (qualityMatch) quality = qualityMatch[1].toLowerCase()
+
+                  const serverName = opt.label.replace(/\s*(\d+p|4k)/i, '').trim()
+                  const isEmbedIframe = !iframeSrc.includes('wibufile') && !iframeSrc.includes('pixeldrain') && !iframeSrc.includes('krakenfiles') && !iframeSrc.includes('gofile')
+
+                  videoSources.push({
+                    label: `[Samehadaku] ${serverName} (${quality})`,
+                    url: iframeSrc,
+                    quality,
+                    isIframe: isEmbedIframe
+                  })
+                }
+              }
+            } catch (err) {
+              console.warn('[Client Scraper] Samehadaku ajax error:', err)
+            }
+          })
+        )
+
+        // B. Extract download links
+        $ep('.download-link ul li, .download-eps li, .sda_download li').each((_, el) => {
+          let quality = 'unknown'
+          const strongText = $ep(el).find('strong').text().trim()
+          const qualityMatch = strongText.match(/(\d+p|4k)/i)
+          if (qualityMatch) {
+            quality = qualityMatch[1].toLowerCase()
+          }
+
+          $ep(el).find('a').each((__, aEl) => {
+            const href = $ep(aEl).attr('href') || ''
+            const label = $ep(aEl).text().trim()
+            
+            if (href && (href.includes('krakenfiles.com') || href.includes('pixeldrain.com') || href.includes('gofile.io') || href.includes('acefile.co') || href.includes('wibufile'))) {
+              let mirrorName = label || 'Download Mirror'
+              if (href.includes('krakenfiles.com')) mirrorName = 'Krakenfiles'
+              else if (href.includes('pixeldrain.com')) mirrorName = 'Pixeldrain'
+              else if (href.includes('gofile.io')) mirrorName = 'Gofile'
+              else if (href.includes('acefile.co')) mirrorName = 'Acefile'
+              else if (href.includes('wibufile')) mirrorName = 'Wibufile'
+
+              if (!videoSources.some(v => v.url === href)) {
+                videoSources.push({
+                  label: `[Samehadaku Direct] ${mirrorName} (${quality})`,
+                  url: href,
+                  quality
+                })
+              }
+            }
+          })
+        })
+
+        if (videoSources.length > 0) break
+      } catch (err) {
+        console.warn('[Client Scraper] Samehadaku episode error:', err)
+      }
     }
   }
 

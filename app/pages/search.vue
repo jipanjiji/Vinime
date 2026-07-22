@@ -151,7 +151,7 @@ function handleSearch() {
           </div>
 
           <!-- Status + Type -->
-          <div class="absolute top-2 right-2 flex flex-col gap-1 items-end">
+          <div v-if="anime.status" class="absolute top-2 right-2 flex flex-col gap-1 items-end">
             <span
               class="px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase backdrop-blur-sm"
               :class="anime.status?.toLowerCase().includes('ongoing')

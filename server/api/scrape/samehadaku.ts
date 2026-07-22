@@ -98,12 +98,13 @@ export default defineEventHandler(async (event) => {
         const href = $(aEl).attr('href') || ''
         const label = $(aEl).text().trim()
         
-        if (href && (href.includes('krakenfiles.com') || href.includes('pixeldrain.com') || href.includes('gofile.io') || href.includes('acefile.co'))) {
+        if (href && (href.includes('krakenfiles.com') || href.includes('pixeldrain.com') || href.includes('gofile.io') || href.includes('acefile.co') || href.includes('wibufile'))) {
           let mirrorName = label || 'Download Mirror'
           if (href.includes('krakenfiles.com')) mirrorName = 'Krakenfiles'
           else if (href.includes('pixeldrain.com')) mirrorName = 'Pixeldrain'
           else if (href.includes('gofile.io')) mirrorName = 'Gofile'
           else if (href.includes('acefile.co')) mirrorName = 'Acefile'
+          else if (href.includes('wibufile')) mirrorName = 'Wibufile'
 
           videoSources.push({
             label: `[Samehadaku Direct] ${mirrorName} (${quality})`,
