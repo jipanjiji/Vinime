@@ -155,6 +155,8 @@ async function scrapeEpisodePage(episodeUrl: string): Promise<Array<{ label: str
   const html = await fetchPage(episodeUrl)
   const $ = cheerio.load(html)
 
+  const candidates: Array<{ label: string; rawUrl: string; quality: string }> = []
+
   // Extract download links (direct video hosting links)
   $('.download ul li').each((_, el) => {
     let quality = 'unknown'
@@ -166,31 +168,67 @@ async function scrapeEpisodePage(episodeUrl: string): Promise<Array<{ label: str
       const href = $(aEl).attr('href') || ''
       const label = $(aEl).text().trim()
 
-      if (href && (
-        href.includes('krakenfiles.com') || 
-        href.includes('pixeldrain.com') || 
-        href.includes('gofile.io') || 
-        href.includes('acefile.co') ||
-        href.includes('wibufile')
-      )) {
-        let mirrorName = label || 'Mirror'
-        if (href.includes('krakenfiles.com')) mirrorName = 'Krakenfiles'
-        else if (href.includes('pixeldrain.com')) mirrorName = 'Pixeldrain'
-        else if (href.includes('gofile.io')) mirrorName = 'Gofile'
-        else if (href.includes('acefile.co')) mirrorName = 'Acefile'
-        else if (href.includes('wibufile')) mirrorName = 'Wibufile'
-
-        if (!videoSources.some(v => v.url === href)) {
-          videoSources.push({
-            label: `[Otakudesu Direct] ${mirrorName} (${quality})`,
-            url: href,
-            quality,
-            isIframe: href.includes('acefile.co')
-          })
-        }
+      if (href && href.startsWith('http')) {
+        candidates.push({ label, rawUrl: href, quality })
       }
     })
   })
+
+  // Resolve desustream redirect links in parallel
+  await Promise.all(
+    candidates.map(async (c) => {
+      try {
+        let finalUrl = c.rawUrl
+        if (c.rawUrl.includes('desustream.com')) {
+          // Perform a fast request checking for 302 location header
+          const res = await fetch(c.rawUrl, {
+            method: 'GET',
+            redirect: 'manual',
+            headers: CHROME_HEADERS,
+            signal: AbortSignal.timeout(6000)
+          })
+          const loc = res.headers.get('location')
+          if (loc) finalUrl = loc
+        }
+
+        const lowerUrl = finalUrl.toLowerCase()
+        const isAllowedHost = 
+          lowerUrl.includes('krakenfiles.com') ||
+          lowerUrl.includes('pixeldrain.com') ||
+          lowerUrl.includes('gofile.io') ||
+          lowerUrl.includes('acefile.co') ||
+          lowerUrl.includes('filedon.co') ||
+          lowerUrl.includes('filedon.io') ||
+          lowerUrl.includes('vikingfile.com') ||
+          lowerUrl.includes('vikingfile.net') ||
+          lowerUrl.includes('wibufile')
+
+        if (isAllowedHost) {
+          let mirrorName = c.label || 'Mirror'
+          if (lowerUrl.includes('krakenfiles.com')) mirrorName = 'Krakenfiles'
+          else if (lowerUrl.includes('pixeldrain.com')) mirrorName = 'Pixeldrain'
+          else if (lowerUrl.includes('gofile.io')) mirrorName = 'Gofile'
+          else if (lowerUrl.includes('acefile.co')) mirrorName = 'Acefile'
+          else if (lowerUrl.includes('filedon.co') || lowerUrl.includes('filedon.io')) mirrorName = 'Filedon'
+          else if (lowerUrl.includes('vikingfile')) mirrorName = 'VikingFile'
+          else if (lowerUrl.includes('wibufile')) mirrorName = 'Wibufile'
+
+          const isIframe = lowerUrl.includes('acefile.co') || lowerUrl.includes('filedon.co') || lowerUrl.includes('filedon.io')
+
+          if (!videoSources.some(v => v.url === finalUrl)) {
+            videoSources.push({
+              label: `[Otakudesu Direct] ${mirrorName} (${c.quality})`,
+              url: finalUrl,
+              quality: c.quality,
+              isIframe
+            })
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[Otakudesu Scraper] Failed to resolve URL ${c.rawUrl}: ${err.message}`)
+      }
+    })
+  )
 
   return videoSources
 }
