@@ -32,6 +32,10 @@ test_*.js
 android/.gradle
 android/build
 android/app/build
-android/.idea
+android/idea
 android/local.properties
+
+# Ignore lockfile to bypass Railway build sync issues
+package-lock.json
+
 
