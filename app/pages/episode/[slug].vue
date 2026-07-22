@@ -505,20 +505,24 @@ async function playResolution(quality, hostIndex = 0, isAutoFailover = true) {
       window.location.hostname === '127.0.0.1'
     )
 
-    const isDirectPlay = isCapacitor ||
-      rawUrl.includes('pixeldrain.com') ||
-      rawUrl.includes('krakenfiles.com') ||
-      rawUrl.includes('gofile.io') ||
+    const isDirectPlay =
       rawUrl.includes('wibufile.com') || rawUrl.includes('archive.org') ||
       rawUrl.includes('cloudflarestorage.com') || rawUrl.includes('filedon.co') ||
       rawUrl.includes('googlevideo.com') || rawUrl.includes('blogger.com') ||
       rawUrl.includes('blogspot.com') || rawUrl.includes('googleusercontent.com')
 
+    const isLocalOrCapacitor = typeof window !== 'undefined' && (
+      window.location.hostname === 'localhost' ||
+      window.location.protocol === 'capacitor:' ||
+      window.location.hostname === '127.0.0.1'
+    )
+    const proxyBase = isLocalOrCapacitor
+      ? 'https://pleasant-purpose-production-7a16.up.railway.app'
+      : ''
+
     const playUrl = isDirectPlay
-      ? (isCapacitor && rawUrl.includes('pixeldrain.com')
-        ? `https://pleasant-purpose-production-7a16.up.railway.app/api/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent(src.url)}`
-        : rawUrl.replace(/\?download$/, ''))
-      : `/api/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent(src.url)}`
+      ? rawUrl.replace(/\?download$/, '')
+      : `${proxyBase}/api/proxy?url=${encodeURIComponent(rawUrl)}&referer=${encodeURIComponent(src.url)}`
 
     selectedVideo.value = {
       title: src.label,
