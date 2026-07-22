@@ -197,7 +197,13 @@ async function loadEpisodeData() {
                 for (const serverName in servers) {
                   const url = servers[serverName]
                   if (url && !allSources.some(s => s.url === url)) {
-                    allSources.push({ label: `[Kuronime] ${serverName} (${cleanQ})`, url, quality: cleanQ, isIframe: true })
+                    const isEmbedIframe = !url.includes('pixeldrain.com') && !url.includes('krakenfiles.com') && !url.includes('gofile.io')
+                    allSources.push({
+                      label: `[Kuronime] ${serverName} (${cleanQ})`,
+                      url,
+                      quality: cleanQ,
+                      isIframe: isEmbedIframe
+                    })
                   }
                 }
               }
