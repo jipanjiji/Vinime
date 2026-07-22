@@ -204,6 +204,13 @@ async function scrapeEpisodePage(episodeUrl: string): Promise<Array<{ label: str
           lowerUrl.includes('wibufile')
 
         if (isAllowedHost) {
+          if (lowerUrl.includes('krakenfiles.com')) {
+            const krMatch = finalUrl.match(/krakenfiles\.com\/view\/([a-zA-Z0-9]+)/)
+            if (krMatch) {
+              finalUrl = `https://krakenfiles.com/embed-video/${krMatch[1]}`
+            }
+          }
+
           let mirrorName = c.label || 'Mirror'
           if (lowerUrl.includes('krakenfiles.com')) mirrorName = 'Krakenfiles'
           else if (lowerUrl.includes('pixeldrain.com')) mirrorName = 'Pixeldrain'
@@ -213,7 +220,10 @@ async function scrapeEpisodePage(episodeUrl: string): Promise<Array<{ label: str
           else if (lowerUrl.includes('vikingfile')) mirrorName = 'VikingFile'
           else if (lowerUrl.includes('wibufile')) mirrorName = 'Wibufile'
 
-          const isIframe = lowerUrl.includes('acefile.co') || lowerUrl.includes('filedon.co') || lowerUrl.includes('filedon.io')
+          const isIframe = lowerUrl.includes('acefile.co') || 
+                           lowerUrl.includes('filedon.co') || 
+                           lowerUrl.includes('filedon.io') ||
+                           lowerUrl.includes('krakenfiles.com')
 
           if (!videoSources.some(v => v.url === finalUrl)) {
             videoSources.push({
