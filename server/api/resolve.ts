@@ -57,6 +57,66 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  // 3. Gofile direct file resolver
+  if (lowerUrl.includes('gofile.io')) {
+    try {
+      const gofileMatch = embedUrl.match(/gofile\.io\/(?:d|download|file)\/?([a-zA-Z0-9]+)/)
+      if (gofileMatch) {
+        const fileId = gofileMatch[1]
+        const tokenRes = await $fetch<any>('https://api.gofile.io/accounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        }).catch(() => null)
+        const token = tokenRes?.data?.token || ''
+
+        const apiRes = await $fetch<any>(`https://api.gofile.io/contents/${fileId}?wt=4fd6sg89d7s6&cache=true`, {
+          headers: {
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            'Referer': 'https://gofile.io/'
+          }
+        }).catch(() => null)
+
+        if (apiRes?.status === 'ok') {
+          const contents = apiRes.data?.children
+          if (contents) {
+            const firstFile = Object.values(contents as Record<string, any>).find((f: any) => f.type === 'file' || f.mimetype?.includes('video'))
+            if (firstFile && (firstFile as any).link) {
+              return { success: true, rawVideoUrl: (firstFile as any).link, type: 'video/mp4', embedUrl }
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // 4. Acefile direct file resolver
+  if (lowerUrl.includes('acefile.co')) {
+    try {
+      const aceHtml = await $fetch<string>(embedUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Referer': 'https://acefile.co/',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        }
+      })
+      const $ace = cheerio.load(aceHtml)
+      const videoSrc = $ace('video source').first().attr('src') ||
+                       $ace('video').first().attr('src') ||
+                       $ace('a[href*="/download/"], a[href*=".mp4"], a[href*=".mkv"]').first().attr('href')
+      if (videoSrc) {
+        const directUrl = videoSrc.startsWith('http') ? videoSrc : `https://acefile.co${videoSrc}`
+        return { success: true, rawVideoUrl: directUrl, type: 'video/mp4', embedUrl }
+      }
+      let foundUrl = ''
+      $ace('script').each((_, el) => {
+        const scriptContent = $ace(el).html() || ''
+        const urlMatch = scriptContent.match(/["'](https?:\/\/[^"']+\.(?:mp4|m3u8|mkv)(?:\?[^"']*)?)['"]/i)
+        if (urlMatch) { foundUrl = urlMatch[1]; return false }
+      })
+      if (foundUrl) return { success: true, rawVideoUrl: foundUrl, type: 'video/mp4', embedUrl }
+    } catch {}
+  }
+
   try {
     // Fetch page
     const html = await $fetch<string>(embedUrl, {
