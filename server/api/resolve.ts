@@ -46,6 +46,9 @@ export default defineEventHandler(async (event) => {
     lowerUrl.includes('googleusercontent.com') ||
     lowerUrl.includes('wibufile.com') ||
     lowerUrl.includes('filedon.co') ||
+    lowerUrl.includes('filedon.io') ||
+    lowerUrl.includes('vikingfile.com') ||
+    lowerUrl.includes('vikingfile.net') ||
     lowerUrl.includes('cloudflarestorage.com') ||
     lowerUrl.includes('archive.org')
   ) {

@@ -171,13 +171,14 @@ async function loadEpisodeData() {
   destroyHls()
 
   try {
-    // Run all scrapers in parallel: server-side episode, kuronime-hash, client-side bypass, Samehadaku server-side, Otakudesu server-side
-    const [data, hashData, clientResult, samehadakuData, otakudesuData] = await Promise.all([
+    // Run all scrapers in parallel: server-side episode, kuronime-hash, client-side bypass, Samehadaku, Otakudesu, Oploverz (all server-side)
+    const [data, hashData, clientResult, samehadakuData, otakudesuData, oploversz] = await Promise.all([
       $fetch(`/api/episode?slug=${encodeURIComponent(epSlug.value)}`).catch(() => null),
       $fetch(`/api/kuronime-hash?slug=${encodeURIComponent(epSlug.value)}`).catch(() => null),
       fetchClientEpisode(epSlug.value).catch(() => null),
       $fetch(`/api/samehadaku-episode?slug=${encodeURIComponent(epSlug.value)}`).catch(() => null),
-      $fetch(`/api/otakudesu-episode?slug=${encodeURIComponent(epSlug.value)}`).catch(() => null)
+      $fetch(`/api/otakudesu-episode?slug=${encodeURIComponent(epSlug.value)}`).catch(() => null),
+      $fetch(`/api/oploverz-episode?slug=${encodeURIComponent(epSlug.value)}`).catch(() => null)
     ])
 
     // Merge server-side sources and determine isIframe flag
@@ -188,6 +189,10 @@ async function loadEpisodeData() {
                        url.includes('gofile.io') ||
                        url.includes('acefile.co') ||
                        url.includes('wibufile.com') ||
+                       url.includes('filedon.co') ||
+                       url.includes('filedon.io') ||
+                       url.includes('vikingfile.com') ||
+                       url.includes('vikingfile.net') ||
                        url.endsWith('.mp4') ||
                        url.includes('.m3u8')
       return {
@@ -208,6 +213,15 @@ async function loadEpisodeData() {
     // Merge server-side Otakudesu sources (works on HP without CORS bypass)
     if (otakudesuData?.success) {
       for (const src of otakudesuData.videoSources) {
+        if (!allSources.some(s => s.url === src.url)) {
+          allSources.push(src)
+        }
+      }
+    }
+
+    // Merge server-side Oploverz sources (Acefile, Filedon, VikingFile - works on HP)
+    if (oploversz?.success) {
+      for (const src of oploversz.videoSources) {
         if (!allSources.some(s => s.url === src.url)) {
           allSources.push(src)
         }
