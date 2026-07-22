@@ -315,6 +315,11 @@ async function loadEpisodeData() {
   }
 }
 
+function getSourceIndex(src) {
+  const sourcesOfQuality = qualityGroups.value[src.quality] || []
+  return sourcesOfQuality.findIndex(s => s.url === src.url)
+}
+
 async function playResolution(quality, hostIndex = 0) {
   const sources = qualityGroups.value[quality]
   if (!sources || sources.length === 0) return
@@ -718,7 +723,6 @@ function handleKeyDown(e) {
           v-if="selectedVideo && selectedVideo.isIframe"
           :src="selectedVideo.playUrl"
           class="w-full h-full border-0 z-10 relative"
-          sandbox="allow-scripts allow-same-origin allow-presentation allow-forms"
           allowfullscreen
           allow="autoplay; encrypted-media; picture-in-picture"
         ></iframe>
@@ -909,6 +913,30 @@ function handleKeyDown(e) {
                 <svg v-else class="w-4 h-4 sm:w-5 sm:h-5 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== SERVER / MIRROR SELECTOR ===== -->
+      <div v-if="videoSources.length > 0" class="mt-4 anim-fade-up anim-delay-1">
+        <div class="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl p-4 space-y-3">
+          <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-[var(--accent)]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3V7.5a3 3 0 013-3h13.5a3 3 0 013 3v3.75a3 3 0 01-3 3zm-13.5 0a3 3 0 00-3 3v3.75a3 3 0 003 3h13.5a3 3 0 003-3V17.25a3 3 0 00-3-3z"/></svg>
+            <h3 class="text-xs sm:text-sm font-bold text-white">Pilih Server / Mirror</h3>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="(src, idx) in videoSources"
+              :key="idx"
+              @click="playResolution(src.quality, getSourceIndex(src))"
+              class="px-3 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 active:scale-95 cursor-pointer"
+              :class="selectedVideo && selectedVideo.playUrl === src.url
+                ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md shadow-[var(--accent-glow)] scale-105'
+                : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:text-white hover:border-white/20'"
+            >
+              <span class="w-1.5 h-1.5 rounded-full" :class="src.isIframe ? 'bg-amber-400' : 'bg-emerald-400'"></span>
+              {{ src.label }}
+            </button>
           </div>
         </div>
       </div>
