@@ -120,6 +120,10 @@ const headerQuery = ref('')
 onMounted(() => {
   try {
     App.addListener('backButton', ({ canGoBack }) => {
+      if (typeof window !== 'undefined' && window.vnimeFullscreenExit) {
+        window.vnimeFullscreenExit()
+        return
+      }
       if (canGoBack) {
         router.back()
       } else {

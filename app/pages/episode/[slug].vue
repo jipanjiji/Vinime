@@ -3,6 +3,7 @@ import { ref, watch, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
 import { useRoute, useRouter, useHead } from '#app'
 import Hls from 'hls.js'
 import { ScreenOrientation } from '@capacitor/screen-orientation'
+import { StatusBar } from '@capacitor/status-bar'
 import { saveEpisodeProgress, getEpisodeProgress } from '~/utils/storage'
 import { fetchClientEpisode, resolveClientVideoUrl } from '~/utils/clientScraper'
 
@@ -101,6 +102,32 @@ onBeforeUnmount(() => {
   destroyHls()
   window.removeEventListener('keydown', handleKeyDown)
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  if (typeof window !== 'undefined') {
+    window.vnimeFullscreenExit = null
+  }
+  try {
+    StatusBar.show()
+  } catch {}
+})
+
+watch(isFullscreen, async (val) => {
+  if (val) {
+    try {
+      await StatusBar.hide()
+    } catch {}
+    if (typeof window !== 'undefined') {
+      window.vnimeFullscreenExit = () => {
+        toggleFullscreen()
+      }
+    }
+  } else {
+    try {
+      await StatusBar.show()
+    } catch {}
+    if (typeof window !== 'undefined') {
+      window.vnimeFullscreenExit = null
+    }
+  }
 })
 
 watch(
