@@ -1,9 +1,55 @@
 import * as cheerio from 'cheerio'
+import { Capacitor, CapacitorHttp } from '@capacitor/core'
 
 const CHROME_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
   'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8'
+}
+
+async function customFetch(url: string, options: any = {}) {
+  const isNative = typeof window !== 'undefined' && Capacitor.isNativePlatform()
+
+  if (isNative) {
+    try {
+      console.log(`[Native HTTP Scrape] Fetching: ${url}`)
+      const headers = options.headers || {}
+      const method = options.method || 'GET'
+      
+      const nativeOptions: any = {
+        url,
+        method,
+        headers,
+        connectTimeout: 12000,
+        readTimeout: 12000
+      }
+
+      if (options.body) {
+        if (typeof options.body === 'string') {
+          nativeOptions.data = options.body
+        } else if (options.body instanceof URLSearchParams) {
+          nativeOptions.data = options.body.toString()
+        } else {
+          nativeOptions.data = options.body
+        }
+      }
+
+      const response = await CapacitorHttp.request(nativeOptions)
+      
+      return {
+        ok: response.status >= 200 && response.status < 300,
+        status: response.status,
+        statusText: response.status.toString(),
+        text: async () => typeof response.data === 'string' ? response.data : JSON.stringify(response.data),
+        json: async () => typeof response.data === 'string' ? JSON.parse(response.data) : response.data
+      }
+    } catch (err: any) {
+      console.error('[Native HTTP Scrape] Failed:', err)
+      throw err
+    }
+  }
+
+  return fetch(url, options)
 }
 
 export async function resolveClientVideoUrl(url: string) {
@@ -32,7 +78,7 @@ export async function resolveClientVideoUrl(url: string) {
   // 3. Krakenfiles direct resolver
   if (url.includes('krakenfiles.com')) {
     try {
-      const res = await fetch(url, { headers: CHROME_HEADERS })
+      const res = await customFetch(url, { headers: CHROME_HEADERS })
       if (res.ok) {
         const html = await res.text()
         const $ = cheerio.load(html)
@@ -50,7 +96,7 @@ export async function resolveClientVideoUrl(url: string) {
 
 export async function fetchClientHomeFeed() {
   try {
-    const res = await fetch('https://kuronime.sbs/', { headers: CHROME_HEADERS })
+    const res = await customFetch('https://kuronime.sbs/', { headers: CHROME_HEADERS })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const html = await res.text()
     const $ = cheerio.load(html)
@@ -137,7 +183,7 @@ export async function fetchClientHomeFeed() {
 
   // Fallback to Otakudesu if Kuronime fails
   try {
-    const res = await fetch('https://otakudesu.cloud/', { headers: CHROME_HEADERS })
+    const res = await customFetch('https://otakudesu.cloud/', { headers: CHROME_HEADERS })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const html = await res.text()
     const $ = cheerio.load(html)
@@ -179,7 +225,7 @@ export async function fetchClientHomeFeed() {
 export async function fetchClientAnimeDetail(slug: string) {
   const targetUrl = `https://kuronime.sbs/anime/${slug}/`
   try {
-    const res = await fetch(targetUrl, { headers: CHROME_HEADERS })
+    const res = await customFetch(targetUrl, { headers: CHROME_HEADERS })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const html = await res.text()
     const $ = cheerio.load(html)
@@ -413,7 +459,7 @@ export async function fetchClientEpisode(epSlug: string) {
 
   for (const otUrl of otakuUrls) {
     try {
-      const res = await fetch(otUrl, { headers: CHROME_HEADERS })
+      const res = await customFetch(otUrl, { headers: CHROME_HEADERS })
       if (!res.ok) continue
       const html = await res.text()
       const $ep = cheerio.load(html)
@@ -456,7 +502,7 @@ export async function fetchClientEpisode(epSlug: string) {
 
   for (const kUrl of kuronimeUrls) {
     try {
-      const res = await fetch(kUrl, { headers: CHROME_HEADERS })
+      const res = await customFetch(kUrl, { headers: CHROME_HEADERS })
       if (!res.ok) continue
       const html = await res.text()
       const $ep = cheerio.load(html)
@@ -497,7 +543,7 @@ export async function fetchClientEpisode(epSlug: string) {
       })
 
       if (hashVal) {
-        const apiRes = await fetch('https://animeku.org/api/v9/sources', {
+        const apiRes = await customFetch('https://animeku.org/api/v9/sources', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -575,7 +621,7 @@ export async function fetchClientEpisode(epSlug: string) {
 
   for (const shUrl of samehadakuUrls) {
     try {
-      const res = await fetch(shUrl, { headers: CHROME_HEADERS })
+      const res = await customFetch(shUrl, { headers: CHROME_HEADERS })
       if (!res.ok) continue
       const html = await res.text()
       const $ep = cheerio.load(html)
@@ -604,7 +650,7 @@ export async function fetchClientEpisode(epSlug: string) {
             payload.append('nume', opt.nume)
             payload.append('type', opt.type)
 
-            const ajaxRes = await fetch(ajaxUrl, {
+            const ajaxRes = await customFetch(ajaxUrl, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -701,7 +747,7 @@ export async function fetchClientEpisode(epSlug: string) {
 
 export async function scrapeSamehadakuClient(targetUrl: string) {
   try {
-    const res = await fetch(targetUrl, { headers: CHROME_HEADERS })
+    const res = await customFetch(targetUrl, { headers: CHROME_HEADERS })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const html = await res.text()
     const $ep = cheerio.load(html)
@@ -732,7 +778,7 @@ export async function scrapeSamehadakuClient(targetUrl: string) {
           payload.append('nume', opt.nume)
           payload.append('type', opt.type)
 
-          const ajaxRes = await fetch(ajaxUrl, {
+          const ajaxRes = await customFetch(ajaxUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/x-www-form-urlencoded',
