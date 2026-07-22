@@ -142,13 +142,14 @@ async function loadEpisodeData() {
   destroyHls()
 
   try {
-    // Run server scrape + client-side Kuronime hash fetch in parallel
-    const [data, hashData] = await Promise.all([
+    // Run server scrape, client-side Kuronime hash fetch, and client-side bypassed scrape (Otakudesu, Kuronime, Samehadaku) in parallel
+    const [data, hashData, clientResult] = await Promise.all([
       $fetch(`/api/episode?slug=${encodeURIComponent(epSlug.value)}`).catch(() => null),
-      $fetch(`/api/kuronime-hash?slug=${encodeURIComponent(epSlug.value)}`).catch(() => null)
+      $fetch(`/api/kuronime-hash?slug=${encodeURIComponent(epSlug.value)}`).catch(() => null),
+      fetchClientEpisode(epSlug.value).catch(() => null)
     ])
 
-    // Merge client-side sources and determine isIframe flag
+    // Merge server-side sources and determine isIframe flag
     const allSources = (data?.videoSources || []).map(s => {
       const url = s.url || ''
       const isDirect = url.includes('pixeldrain.com') ||
@@ -164,6 +165,15 @@ async function loadEpisodeData() {
       }
     })
 
+    // Merge client-side bypassed sources (Otakudesu, Kuronime, Samehadaku)
+    if (clientResult?.success) {
+      for (const src of clientResult.videoSources) {
+        if (!allSources.some(s => s.url === src.url)) {
+          allSources.push(src)
+        }
+      }
+    }
+
     if (hashData?.success) {
       // 1. Add direct HTML links (Pixeldrain, Krakenfiles extracted from page HTML)
       for (const d of (hashData.directLinks || [])) {
@@ -171,7 +181,8 @@ async function loadEpisodeData() {
           allSources.push({
             label: `[Kuronime Direct] ${d.mirror} (${d.quality})`,
             url: d.url,
-            quality: d.quality
+            quality: d.quality,
+            isIframe: false
           })
         }
       }
@@ -230,7 +241,7 @@ async function loadEpisodeData() {
                   const url = mirrors[mirrorName]
                   if (url && (url.includes('pixeldrain.com') || url.includes('krakenfiles.com') || url.includes('gofile.io') || url.includes('acefile.co'))) {
                     if (!allSources.some(s => s.url === url)) {
-                      allSources.push({ label: `[Kuronime Direct] ${mirrorName} (${cleanQ})`, url, quality: cleanQ })
+                      allSources.push({ label: `[Kuronime Direct] ${mirrorName} (${cleanQ})`, url, quality: cleanQ, isIframe: false })
                     }
                   }
                 }
@@ -239,14 +250,6 @@ async function loadEpisodeData() {
         } catch (animekuErr) {
           console.warn('[Client] animeku.org call failed:', animekuErr)
         }
-      }
-    }
-
-    if (allSources.length === 0) {
-      // Direct Native Client Scrape on user's device (bypasses Vercel Server 500/403)
-      const clientResult = await fetchClientEpisode(epSlug.value)
-      if (clientResult?.success) {
-        allSources.push(...clientResult.videoSources)
       }
     }
 
@@ -715,6 +718,7 @@ function handleKeyDown(e) {
           v-if="selectedVideo && selectedVideo.isIframe"
           :src="selectedVideo.playUrl"
           class="w-full h-full border-0 z-10 relative"
+          sandbox="allow-scripts allow-same-origin allow-presentation allow-forms"
           allowfullscreen
           allow="autoplay; encrypted-media; picture-in-picture"
         ></iframe>
