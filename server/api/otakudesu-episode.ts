@@ -185,7 +185,7 @@ async function scrapeEpisodePage(episodeUrl: string): Promise<Array<{ label: str
             label: `[Otakudesu Direct] ${mirrorName} (${quality})`,
             url: href,
             quality,
-            isIframe: false
+            isIframe: href.includes('acefile.co')
           })
         }
       }

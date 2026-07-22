@@ -135,7 +135,7 @@ export default defineEventHandler(async (event) => {
             label: `[Samehadaku Direct] ${mirrorName} (${quality})`,
             url: href,
             quality,
-            isIframe: false
+            isIframe: href.includes('acefile.co')
           })
         }
       }

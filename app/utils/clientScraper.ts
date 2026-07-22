@@ -482,7 +482,8 @@ export async function fetchClientEpisode(epSlug: string) {
             videoSources.push({
               label: `[Otakudesu Direct] ${mirrorName} (${quality})`,
               url: href,
-              quality
+              quality,
+              isIframe: href.includes('acefile.co') || href.includes('filedon.co') || href.includes('filedon.io')
             })
           }
         })
@@ -525,7 +526,8 @@ export async function fetchClientEpisode(epSlug: string) {
             videoSources.push({
               label: `[Kuronime Direct] ${mirror} (${quality})`,
               url: href,
-              quality
+              quality,
+              isIframe: href.includes('acefile.co') || href.includes('filedon.co') || href.includes('filedon.io')
             })
           }
         }
@@ -724,7 +726,8 @@ export async function fetchClientEpisode(epSlug: string) {
               videoSources.push({
                 label: `[Samehadaku Direct] ${mirrorName} (${quality})`,
                 url: href,
-                quality
+                quality,
+                isIframe: href.includes('acefile.co') || href.includes('filedon.co') || href.includes('filedon.io')
               })
             }
           }
@@ -853,7 +856,7 @@ export async function scrapeSamehadakuClient(targetUrl: string) {
               label: `[Samehadaku Direct] ${mirrorName} (${quality})`,
               url: href,
               quality,
-              isIframe: false
+              isIframe: href.includes('acefile.co') || href.includes('filedon.co') || href.includes('filedon.io')
             })
           }
         }

@@ -136,7 +136,7 @@ function parseOploversDownloads(html: string, pageUrl: string) {
           label: `[Oploverz] ${mirrorName} (${quality})`,
           url: href,
           quality,
-          isIframe: false
+          isIframe: href.includes('acefile.co') || href.includes('filedon.co') || href.includes('filedon.io')
         })
       }
     })
@@ -173,7 +173,7 @@ function parseOploversDownloads(html: string, pageUrl: string) {
           label: `[Oploverz] ${mirrorName} (${quality})`,
           url: href,
           quality,
-          isIframe: false
+          isIframe: href.includes('acefile.co') || href.includes('filedon.co') || href.includes('filedon.io')
         })
       }
     })
