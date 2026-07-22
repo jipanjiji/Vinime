@@ -316,6 +316,7 @@ async function loadEpisodeData() {
         groups[q].sort((a, b) => getHostPriority(a.label) - getHostPriority(b.label))
       }
       qualityGroups.value = groups
+      videoSources.value = allSources
 
       const getQVal = (q) => q.toLowerCase() === '4k' ? 2160 : (parseInt(q) || 0)
       availableQualities.value = Object.keys(groups)
