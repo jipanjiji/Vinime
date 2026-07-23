@@ -28,6 +28,18 @@ const selectedQuality = ref('')
 const currentHostIndex = ref(0)
 const showQualityMenu = ref(false)
 
+function cleanSourceUrl(url) {
+  if (!url) return ''
+  let clean = url
+  if (clean.includes('filedon.co') || clean.includes('filedon.io')) {
+    clean = clean.replace('/view/', '/embed/')
+  }
+  if (clean.includes('pixeldrain.com')) {
+    clean = clean.replace('/u/', '/api/file/')
+  }
+  return clean
+}
+
 // Parent anime & Episode Navigation
 const parentAnime = ref(null)
 const currentEpisodeNumber = ref('')
@@ -86,6 +98,93 @@ let controlsTimeoutId = null
 let lastSavedSecond = 0
 let hasSeekedInitial = false
 
+const episodeViews = ref(0)
+const episodeReleaseDate = ref(null)
+const isMobileDevice = ref(false)
+
+const currentEpisodeViews = computed(() => {
+  if (episodeViews.value > 0) return episodeViews.value
+  if (parentAnime.value?.episodes) {
+    const cur = parentAnime.value.episodes.find(e => e.slug === epSlug.value)
+    if (cur && cur.views) return cur.views
+  }
+  return 12500
+})
+
+const currentEpisodeReleaseDate = computed(() => {
+  if (episodeReleaseDate.value) return episodeReleaseDate.value
+  if (parentAnime.value?.episodes) {
+    const cur = parentAnime.value.episodes.find(e => e.slug === epSlug.value)
+    if (cur && cur.releaseDate) return cur.releaseDate
+  }
+  return ''
+})
+
+function formatViews(v) {
+  if (!v) return '0'
+  const num = parseInt(v)
+  if (isNaN(num)) return v
+  if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M'
+  if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K'
+  return num.toString()
+}
+
+function formatRelativeDate(isoStr) {
+  if (!isoStr) return ''
+  const date = new Date(isoStr)
+  if (isNaN(date.getTime())) return isoStr
+  const now = new Date()
+  const diffTime = now.getTime() - date.getTime()
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+  if (diffDays < 0) return 'segera'
+  if (diffDays === 0) {
+    const diffHours = Math.floor(diffTime / (1000 * 60 * 60))
+    if (diffHours < 1) return 'baru saja'
+    return `${diffHours} jam lalu`
+  }
+  if (diffDays === 1) return 'kemarin'
+  if (diffDays < 30) return `${diffDays} hari lalu`
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+  return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`
+}
+
+let iframeProgressInterval = null
+
+function startIframeProgressTracking() {
+  stopIframeProgressTracking()
+  if (!parentAnime.value) return
+  const prog = getEpisodeProgress(parentAnime.value.slug, epSlug.value)
+  if (prog && prog.lastTime > 3) {
+    currentTime.value = prog.lastTime
+    duration.value = prog.duration || 1440
+  } else {
+    currentTime.value = 0
+    duration.value = 1440
+  }
+  iframeProgressInterval = setInterval(() => {
+    if (currentTime.value < duration.value) {
+      currentTime.value += 1
+      if (currentTime.value % 5 === 0) {
+        saveCurrentProgress()
+      }
+    }
+  }, 1000)
+}
+
+function stopIframeProgressTracking() {
+  if (iframeProgressInterval) {
+    clearInterval(iframeProgressInterval)
+    iframeProgressInterval = null
+  }
+}
+
+watch([selectedVideo, parentAnime], ([newVid, newAnime]) => {
+  stopIframeProgressTracking()
+  if (newVid && newVid.isIframe && newAnime) {
+    startIframeProgressTracking()
+  }
+})
+
 const progressPercent = computed(() =>
   duration.value ? (currentTime.value / duration.value) * 100 : 0
 )
@@ -108,6 +207,7 @@ function getHostPriority(label) {
 }
 
 onMounted(async () => {
+  isMobileDevice.value = window.matchMedia('(max-width: 768px)').matches || ('ontouchstart' in window)
   window.addEventListener('keydown', handleKeyDown)
   document.addEventListener('fullscreenchange', handleFullscreenChange)
   await loadEpisodeData()
@@ -214,7 +314,7 @@ async function loadEpisodeData() {
 
     // Merge server-side sources and determine isIframe flag
     const allSources = (data?.videoSources || []).map(s => {
-      const url = s.url || ''
+      const url = cleanSourceUrl(s.url)
       const isDirect = url.includes('pixeldrain.com') ||
                        url.includes('krakenfiles.com') ||
                        url.includes('gofile.io') ||
@@ -228,6 +328,7 @@ async function loadEpisodeData() {
                        url.includes('.m3u8')
       return {
         ...s,
+        url,
         isIframe: s.isIframe !== undefined ? s.isIframe : !isDirect
       }
     })
@@ -235,8 +336,9 @@ async function loadEpisodeData() {
     // Merge server-side Samehadaku sources (works on HP without CORS bypass)
     if (samehadakuData?.success) {
       for (const src of samehadakuData.videoSources) {
-        if (!allSources.some(s => s.url === src.url)) {
-          allSources.push(src)
+        const url = cleanSourceUrl(src.url)
+        if (!allSources.some(s => s.url === url)) {
+          allSources.push({ ...src, url })
         }
       }
     }
@@ -244,8 +346,9 @@ async function loadEpisodeData() {
     // Merge server-side Otakudesu sources (works on HP without CORS bypass)
     if (otakudesuData?.success) {
       for (const src of otakudesuData.videoSources) {
-        if (!allSources.some(s => s.url === src.url)) {
-          allSources.push(src)
+        const url = cleanSourceUrl(src.url)
+        if (!allSources.some(s => s.url === url)) {
+          allSources.push({ ...src, url })
         }
       }
     }
@@ -253,8 +356,9 @@ async function loadEpisodeData() {
     // Merge server-side Oploverz sources (Acefile, Filedon, VikingFile - works on HP)
     if (oploversz?.success) {
       for (const src of oploversz.videoSources) {
-        if (!allSources.some(s => s.url === src.url)) {
-          allSources.push(src)
+        const url = cleanSourceUrl(src.url)
+        if (!allSources.some(s => s.url === url)) {
+          allSources.push({ ...src, url })
         }
       }
     }
@@ -262,8 +366,9 @@ async function loadEpisodeData() {
     // Merge client-side bypassed sources (Otakudesu, Kuronime, Samehadaku) — PC with CORS extension only
     if (clientResult?.success) {
       for (const src of clientResult.videoSources) {
-        if (!allSources.some(s => s.url === src.url)) {
-          allSources.push(src)
+        const url = cleanSourceUrl(src.url)
+        if (!allSources.some(s => s.url === url)) {
+          allSources.push({ ...src, url })
         }
       }
     }
@@ -271,10 +376,11 @@ async function loadEpisodeData() {
     if (hashData?.success) {
       // 1. Add direct HTML links (Pixeldrain, Krakenfiles extracted from page HTML)
       for (const d of (hashData.directLinks || [])) {
-        if (!allSources.some(s => s.url === d.url)) {
+        const url = cleanSourceUrl(d.url)
+        if (!allSources.some(s => s.url === url)) {
           allSources.push({
             label: `[Kuronime Direct] ${d.mirror} (${d.quality})`,
-            url: d.url,
+            url,
             quality: d.quality,
             isIframe: false
           })
@@ -291,56 +397,56 @@ async function loadEpisodeData() {
 
           if (proxyRes?.success && proxyRes.data?.status === 200 && proxyRes.data?.mirror) {
             const json = proxyRes.data
-              const { default: CryptoJS } = await import('crypto-js')
+            const { default: CryptoJS } = await import('crypto-js')
 
-              const CryptoJSAesJson = {
-                parse: function(jsonStr) {
-                  const j = JSON.parse(jsonStr)
-                  const cp = CryptoJS.lib.CipherParams.create({ ciphertext: CryptoJS.enc.Base64.parse(j.ct) })
-                  if (j.iv) cp.iv = CryptoJS.enc.Hex.parse(j.iv)
-                  if (j.s) cp.salt = CryptoJS.enc.Hex.parse(j.s)
-                  return cp
+            const CryptoJSAesJson = {
+              parse: function(jsonStr) {
+                const j = JSON.parse(jsonStr)
+                const cp = CryptoJS.lib.CipherParams.create({ ciphertext: CryptoJS.enc.Base64.parse(j.ct) })
+                if (j.iv) cp.iv = CryptoJS.enc.Hex.parse(j.iv)
+                if (j.s) cp.salt = CryptoJS.enc.Hex.parse(j.s)
+                return cp
+              }
+            }
+
+            const decryptedBase64 = atob(json.mirror)
+            const decryptedBytes = CryptoJS.AES.decrypt(decryptedBase64, '3&!Z0M,VIZ;dZW==', { format: CryptoJSAesJson })
+            const decryptedData = JSON.parse(decryptedBytes.toString(CryptoJS.enc.Utf8))
+
+            // Add embed sources
+            const embed = decryptedData.embed || {}
+            for (const quality in embed) {
+              const servers = embed[quality]
+              const cleanQ = quality.replace(/^v/, '')
+              for (const serverName in servers) {
+                const url = cleanSourceUrl(servers[serverName])
+                if (url && !allSources.some(s => s.url === url)) {
+                  const isEmbedIframe = !url.includes('pixeldrain.com') && !url.includes('krakenfiles.com') && !url.includes('gofile.io')
+                  allSources.push({
+                    label: `[Kuronime] ${serverName} (${cleanQ})`,
+                    url,
+                    quality: cleanQ,
+                    isIframe: isEmbedIframe
+                  })
                 }
               }
+            }
 
-              const decryptedBase64 = atob(json.mirror)
-              const decryptedBytes = CryptoJS.AES.decrypt(decryptedBase64, '3&!Z0M,VIZ;dZW==', { format: CryptoJSAesJson })
-              const decryptedData = JSON.parse(decryptedBytes.toString(CryptoJS.enc.Utf8))
-
-              // Add embed sources
-              const embed = decryptedData.embed || {}
-              for (const quality in embed) {
-                const servers = embed[quality]
-                const cleanQ = quality.replace(/^v/, '')
-                for (const serverName in servers) {
-                  const url = servers[serverName]
-                  if (url && !allSources.some(s => s.url === url)) {
-                    const isEmbedIframe = !url.includes('pixeldrain.com') && !url.includes('krakenfiles.com') && !url.includes('gofile.io')
-                    allSources.push({
-                      label: `[Kuronime] ${serverName} (${cleanQ})`,
-                      url,
-                      quality: cleanQ,
-                      isIframe: isEmbedIframe
-                    })
-                  }
-                }
-              }
-
-              // Add direct download mirrors
-              const download = decryptedData.download || {}
-              for (const quality in download) {
-                const mirrors = download[quality]
-                const cleanQ = quality.replace(/^v/, '')
-                for (const mirrorName in mirrors) {
-                  const url = mirrors[mirrorName]
-                  if (url && (url.includes('pixeldrain.com') || url.includes('krakenfiles.com') || url.includes('gofile.io') || url.includes('acefile.co'))) {
-                    if (!allSources.some(s => s.url === url)) {
-                      allSources.push({ label: `[Kuronime Direct] ${mirrorName} (${cleanQ})`, url, quality: cleanQ, isIframe: false })
-                    }
+            // Add direct download mirrors
+            const download = decryptedData.download || {}
+            for (const quality in download) {
+              const mirrors = download[quality]
+              const cleanQ = quality.replace(/^v/, '')
+              for (const mirrorName in mirrors) {
+                const url = cleanSourceUrl(mirrors[mirrorName])
+                if (url && (url.includes('pixeldrain.com') || url.includes('krakenfiles.com') || url.includes('gofile.io') || url.includes('acefile.co'))) {
+                  if (!allSources.some(s => s.url === url)) {
+                    allSources.push({ label: `[Kuronime Direct] ${mirrorName} (${cleanQ})`, url, quality: cleanQ, isIframe: false })
                   }
                 }
               }
             }
+          }
         } catch (animekuErr) {
           console.warn('[Client] animeku.org call failed:', animekuErr)
         }
@@ -349,6 +455,8 @@ async function loadEpisodeData() {
 
     if (allSources.length > 0) {
       parentAnime.value = data?.anime
+      episodeViews.value = data?.episodeViews || 0
+      episodeReleaseDate.value = data?.episodeReleaseDate || null
 
       if (!parentAnime.value) {
         const deducedSlug = epSlug.value
@@ -434,7 +542,7 @@ function toggleBackup(src) {
   }
 }
 
-async function playResolution(quality, hostIndex = 0, isAutoFailover = true) {
+async function playResolution(quality, hostIndex = 0, isAutoFailover = true, tryProxy = false) {
   const sources = qualityGroups.value[quality]
   if (!sources || sources.length === 0) return
 
@@ -444,7 +552,7 @@ async function playResolution(quality, hostIndex = 0, isAutoFailover = true) {
     if (qIndex > 0) {
       const nextQuality = availableQualities.value[qIndex - 1]
       console.info(`[Failover Engine] Falling back to lower quality: ${nextQuality}`)
-      playResolution(nextQuality, 0, isAutoFailover)
+      playResolution(nextQuality, 0, isAutoFailover, false)
     } else {
       errorMsg.value = `Gagal memutar video. Semua server cermin offline.`
       isResolving.value = false
@@ -457,13 +565,14 @@ async function playResolution(quality, hostIndex = 0, isAutoFailover = true) {
   const src = sources[hostIndex]
   if (src.isIframe && isAutoFailover) {
     console.info(`[Failover Engine] Skipping iframe source during auto-failover: ${src.label}`)
-    playResolution(quality, hostIndex + 1, true)
+    playResolution(quality, hostIndex + 1, true, false)
     return
   }
 
   currentHostIndex.value = hostIndex
   selectedQuality.value = quality
   isResolving.value = true
+  isBuffering.value = false
   errorMsg.value = ''
   destroyHls()
   selectedVideo.value = null
@@ -494,7 +603,7 @@ async function playResolution(quality, hostIndex = 0, isAutoFailover = true) {
     }
 
     if (!resolveData?.success || !resolveData.rawVideoUrl) {
-      playResolution(quality, hostIndex + 1, isAutoFailover)
+      playResolution(quality, hostIndex + 1, isAutoFailover, false)
       return
     }
 
@@ -510,13 +619,14 @@ async function playResolution(quality, hostIndex = 0, isAutoFailover = true) {
       rawUrl.includes('wibufile.com') || rawUrl.includes('archive.org') ||
       rawUrl.includes('cloudflarestorage.com') || rawUrl.includes('filedon.co') ||
       rawUrl.includes('googlevideo.com') || rawUrl.includes('blogger.com') ||
-      rawUrl.includes('blogspot.com') || rawUrl.includes('googleusercontent.com')
+      rawUrl.includes('blogspot.com') || rawUrl.includes('googleusercontent.com') ||
+      (rawUrl.includes('pixeldrain.com') && !tryProxy)
 
-    const isLocalOrCapacitor = typeof window !== 'undefined' && (
+    const isLocalOrCapacitor = import.meta.dev || (typeof window !== 'undefined' && (
       window.location.hostname === 'localhost' ||
       window.location.protocol === 'capacitor:' ||
       window.location.hostname === '127.0.0.1'
-    )
+    ))
     const proxyBase = isLocalOrCapacitor
       ? 'https://pleasant-purpose-production-7a16.up.railway.app'
       : ''
@@ -580,7 +690,12 @@ async function playResolution(quality, hostIndex = 0, isAutoFailover = true) {
           hlsInstance.on(Hls.Events.ERROR, (_, data) => {
             if (data.fatal) {
               destroyHls()
-              playResolution(quality, hostIndex + 1, isAutoFailover)
+              if (src.url.includes('pixeldrain.com') && !tryProxy) {
+                console.info('[Player Failover] Direct Pixeldrain manifest failed. Retrying with proxy...')
+                playResolution(quality, hostIndex, isAutoFailover, true)
+              } else {
+                playResolution(quality, hostIndex + 1, isAutoFailover, false)
+              }
             }
           })
         } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
@@ -592,7 +707,12 @@ async function playResolution(quality, hostIndex = 0, isAutoFailover = true) {
         videoEl.onerror = null
         videoEl.onerror = () => {
           videoEl.onerror = null
-          playResolution(quality, hostIndex + 1, isAutoFailover)
+          if (src.url.includes('pixeldrain.com') && !tryProxy) {
+            console.info('[Player Failover] Direct Pixeldrain stream connection failed. Retrying with proxy...')
+            playResolution(quality, hostIndex, isAutoFailover, true)
+          } else {
+            playResolution(quality, hostIndex + 1, isAutoFailover, false)
+          }
         }
         videoEl.src = playUrl
         videoEl.load()
@@ -605,7 +725,7 @@ async function playResolution(quality, hostIndex = 0, isAutoFailover = true) {
       }
     })
   } catch {
-    playResolution(quality, hostIndex + 1, isAutoFailover)
+    playResolution(quality, hostIndex + 1, isAutoFailover, false)
   }
 }
 
@@ -731,6 +851,37 @@ function toggleSpeed() {
   v.playbackRate = playbackSpeed.value
 }
 
+function handleVideoClick(e) {
+  if (selectedVideo.value?.isIframe) return
+
+  const path = e.composedPath ? e.composedPath() : []
+  const isInteractive = path.some(el => {
+    if (!el.tagName) return false
+    return (
+      el.tagName === 'BUTTON' ||
+      el.tagName === 'A' ||
+      el.tagName === 'INPUT' ||
+      el.classList?.contains('player-slider') ||
+      el.classList?.contains('interactive') ||
+      el.classList?.contains('quality-btn')
+    )
+  })
+
+  if (isInteractive) return
+
+  if (isMobileDevice.value) {
+    showControls.value = !showControls.value
+    if (controlsTimeoutId) clearTimeout(controlsTimeoutId)
+    if (showControls.value && isPlaying.value) {
+      controlsTimeoutId = setTimeout(() => {
+        if (isPlaying.value && !isBuffering.value) showControls.value = false
+      }, 3000)
+    }
+  } else {
+    togglePlay()
+  }
+}
+
 async function toggleFullscreen() {
   const c = document.getElementById('video-container')
   if (!c) return
@@ -743,7 +894,15 @@ async function toggleFullscreen() {
     } catch {}
   } else {
     try {
-      await c.requestFullscreen()
+      if (c.requestFullscreen) {
+        await c.requestFullscreen({ navigationUI: 'hide' })
+      } else if (c.webkitRequestFullscreen) {
+        await c.webkitRequestFullscreen({ navigationUI: 'hide' })
+      } else if (c.mozRequestFullScreen) {
+        await c.mozRequestFullScreen({ navigationUI: 'hide' })
+      } else if (c.msRequestFullscreen) {
+        await c.msRequestFullscreen({ navigationUI: 'hide' })
+      }
     } catch {}
   }
 }
@@ -768,6 +927,10 @@ function handleKeyDown(e) {
     case 'arrowdown': e.preventDefault(); volume.value = Math.max(0, parseFloat((volume.value - 0.1).toFixed(2))); handleVolumeChange(); break
     case 'f': e.preventDefault(); toggleFullscreen(); break
   }
+}
+
+function cleanTitle(t) {
+  return (t || '').replace('Nonton Anime ', '').replace('Sub Indo', '').trim()
 }
 </script>
 
@@ -799,7 +962,7 @@ function handleKeyDown(e) {
         style="aspect-ratio: 16/9;"
         @mousemove="handleMouseMove"
         @mouseleave="showControls = false; stopHoldSpeed()"
-        @click.self="togglePlay"
+        @click="handleVideoClick"
         @touchstart="startHoldSpeed"
         @touchend="stopHoldSpeed"
         @touchcancel="stopHoldSpeed"
@@ -848,7 +1011,7 @@ function handleKeyDown(e) {
           playsinline
           referrerpolicy="no-referrer"
           class="w-full h-full object-contain"
-          @click="togglePlay"
+          @click="handleVideoClick"
           @timeupdate="handleTimeUpdate"
           @durationchange="handleDurationChange"
           @waiting="handleWaiting"
@@ -1056,21 +1219,34 @@ function handleKeyDown(e) {
       </div>
 
 
-
       <!-- ===== INFO BAR ===== -->
-      <div class="mt-5 pb-5 border-b border-[var(--border-subtle)] anim-fade-up anim-delay-2">
+      <div v-if="parentAnime" class="mt-5 pb-5 border-b border-[var(--border-subtle)] anim-fade-up anim-delay-2">
         <div class="flex items-start gap-4">
           <!-- Cover thumbnail -->
-          <div v-if="parentAnime" class="hidden sm:block w-12 h-16 rounded-lg overflow-hidden shrink-0 bg-[var(--bg-card)] border border-[var(--border-subtle)]">
+          <div class="hidden sm:block w-12 h-16 rounded-xl overflow-hidden shrink-0 bg-[var(--bg-card)] border border-[var(--border-subtle)]">
             <img :src="parentAnime.cover" class="w-full h-full object-cover" />
           </div>
           <div class="min-w-0 flex-1">
-            <h2 v-if="parentAnime" class="text-base sm:text-lg font-bold text-white truncate">
-              {{ parentAnime.title.replace('Nonton Anime ', '').replace('Sub Indo', '').trim() }}
+            <h2 class="text-base sm:text-lg font-extrabold text-white leading-tight">
+              {{ cleanTitle(parentAnime.title) }}
             </h2>
-            <p v-if="currentEpisodeNumber" class="text-xs text-[var(--accent)] mt-1 font-semibold">
-              Episode {{ currentEpisodeNumber }}
-            </p>
+            <div class="flex items-center gap-2 text-xs text-[var(--text-secondary)] font-semibold mt-1.5 flex-wrap">
+              <span>Episode {{ currentEpisodeNumber }}</span>
+              <span class="text-white/20">·</span>
+              <span class="inline-flex items-center gap-0.5">
+                <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+                {{ formatViews(currentEpisodeViews) }}
+              </span>
+              <span v-if="currentEpisodeReleaseDate" class="text-white/20">·</span>
+              <span v-if="currentEpisodeReleaseDate">
+                {{ formatRelativeDate(currentEpisodeReleaseDate) }}
+              </span>
+              <span class="text-white/20">·</span>
+              <span class="text-red-400 cursor-pointer hover:underline inline-flex items-center gap-0.5">
+                <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5"/></svg>
+                Report
+              </span>
+            </div>
           </div>
         </div>
       </div>

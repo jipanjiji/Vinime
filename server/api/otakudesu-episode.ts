@@ -210,6 +210,9 @@ async function scrapeEpisodePage(episodeUrl: string): Promise<Array<{ label: str
               finalUrl = `https://krakenfiles.com/embed-video/${krMatch[1]}`
             }
           }
+          if (lowerUrl.includes('filedon.co') || lowerUrl.includes('filedon.io')) {
+            finalUrl = finalUrl.replace('/view/', '/embed/')
+          }
 
           let mirrorName = c.label || 'Mirror'
           if (lowerUrl.includes('krakenfiles.com')) mirrorName = 'Krakenfiles'

@@ -72,6 +72,34 @@ function handleToggleSubscribe() {
 function cleanTitle(t) {
   return (t || '').replace('Nonton Anime ', '').replace('Sub Indo', '').trim()
 }
+
+function formatViews(v) {
+  if (!v) return '0'
+  const num = parseInt(v)
+  if (isNaN(num)) return v
+  if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M'
+  if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K'
+  return num.toString()
+}
+
+function formatRelativeDate(isoStr) {
+  if (!isoStr) return ''
+  const date = new Date(isoStr)
+  if (isNaN(date.getTime())) return isoStr
+  const now = new Date()
+  const diffTime = now.getTime() - date.getTime()
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+  if (diffDays < 0) return 'segera'
+  if (diffDays === 0) {
+    const diffHours = Math.floor(diffTime / (1000 * 60 * 60))
+    if (diffHours < 1) return 'baru saja'
+    return `${diffHours} jam lalu`
+  }
+  if (diffDays === 1) return 'kemarin'
+  if (diffDays < 30) return `${diffDays} hari lalu`
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+  return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`
+}
 </script>
 
 <template>
@@ -152,10 +180,25 @@ function cleanTitle(t) {
                   {{ cleanTitle(animeDetails.title) }}
                 </h1>
 
-                <div class="flex items-center justify-center sm:justify-start gap-3 flex-wrap text-sm">
-                  <span class="text-[var(--text-secondary)] font-medium">{{ animeDetails.episodes?.length || 0 }} Episode</span>
-                  <span v-if="animeDetails.type" class="text-white/20">·</span>
-                  <span v-if="animeDetails.type" class="text-[var(--text-muted)] uppercase text-xs font-bold">{{ animeDetails.type }}</span>
+                <div class="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1.5 text-xs sm:text-sm text-[var(--text-secondary)] font-medium">
+                  <span class="inline-flex items-center gap-1 text-amber-400 font-bold">
+                    ⭐ {{ animeDetails.score || '0.0' }}
+                  </span>
+                  <span class="text-white/20">·</span>
+                  <span v-if="animeDetails.studio && animeDetails.studio !== 'Unknown'" class="px-2.5 py-0.5 rounded bg-white/5 border border-white/10 text-white text-[11px] font-semibold">
+                    {{ animeDetails.studio }}
+                  </span>
+                  <span v-if="animeDetails.studio && animeDetails.studio !== 'Unknown'" class="text-white/20">·</span>
+                  <span v-if="animeDetails.released && animeDetails.released !== 'Unknown'" class="text-[var(--text-secondary)]">
+                    {{ animeDetails.released }}
+                  </span>
+                  <span v-if="animeDetails.released && animeDetails.released !== 'Unknown'" class="text-white/20">·</span>
+                  <span v-if="animeDetails.type" class="text-[var(--text-muted)] uppercase font-bold text-xs">{{ animeDetails.type }}</span>
+                  <span v-if="animeDetails.views" class="text-white/20">·</span>
+                  <span v-if="animeDetails.views" class="inline-flex items-center gap-1 text-[var(--text-secondary)]">
+                    <svg class="w-3.5 h-3.5 stroke-current fill-none stroke-[2.2]" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+                    {{ formatViews(animeDetails.views) }} views
+                  </span>
                 </div>
 
                 <!-- Genre Pills -->
@@ -262,22 +305,29 @@ function cleanTitle(t) {
               ? 'border-red-500/30 bg-red-500/5'
               : 'border-[var(--border-subtle)] hover:border-[var(--accent)]/40'"
           >
-            <!-- Left: Episode number & Date -->
+            <!-- Left: Episode number & Views -->
             <div class="space-y-1">
               <p class="text-sm sm:text-base font-bold text-white group-hover:text-[var(--accent)] transition-colors">
                 Episode {{ ep.episodeNumber }}
               </p>
-              <p v-if="ep.date" class="text-xs text-[var(--text-muted)] font-medium">
-                {{ ep.date }}
-              </p>
+              <div class="flex items-center gap-1 text-[var(--text-muted)] text-[11px] font-semibold">
+                <svg class="w-3.5 h-3.5 stroke-current fill-none stroke-[2]" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+                <span>{{ formatViews(ep.views) }}</span>
+              </div>
             </div>
 
-            <!-- Right: Watch Progress Time or Arrow -->
-            <div class="flex items-center gap-3">
-              <span v-if="watchHistory?.episodesProgress?.[ep.slug]" class="text-xs sm:text-sm font-semibold text-white/90 tabular-nums">
-                {{ formatSeconds(watchHistory.episodesProgress[ep.slug].lastTime) }}/{{ formatSeconds(watchHistory.episodesProgress[ep.slug].duration) }}
+            <!-- Right: Relative Date & Progress & Arrow -->
+            <div class="flex items-center gap-3 sm:gap-4">
+              <span v-if="ep.releaseDate" class="text-xs text-[var(--text-secondary)] font-bold text-[11px] sm:text-xs">
+                {{ formatRelativeDate(ep.releaseDate) }}
               </span>
-              <svg class="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--accent)] group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+
+              <div class="flex items-center gap-2">
+                <span v-if="watchHistory?.episodesProgress?.[ep.slug]" class="text-xs sm:text-sm font-semibold text-white/90 tabular-nums">
+                  {{ formatSeconds(watchHistory.episodesProgress[ep.slug].lastTime) }}/{{ formatSeconds(watchHistory.episodesProgress[ep.slug].duration) }}
+                </span>
+                <svg class="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--accent)] group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+              </div>
             </div>
 
             <!-- Bottom Red Progress Bar -->

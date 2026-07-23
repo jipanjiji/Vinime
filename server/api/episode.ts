@@ -15,7 +15,9 @@ export default defineEventHandler(async (event) => {
   try {
     const videoSources: Array<{ label: string; url: string; quality: string }> = []
     let parentAnime: any = null
-
+    let episodeViews = 0
+    let episodeReleaseDate = ''
+ 
     // A. KURONIME SCRAPER ENGINE (Resolve canonical metadata first)
     const kuronimeUrl = `https://kuronime.sbs/${episodeSlug}/`
     console.log(`[Episode Engine] Scraping Kuronime Watch Page: ${kuronimeUrl}`)
@@ -36,6 +38,10 @@ export default defineEventHandler(async (event) => {
       })
       const $ep = cheerio.load(epHtml)
 
+      episodeViews = parseInt($ep('.post-views-count').first().text().replace(/\D/g, '')) || 0
+      episodeReleaseDate = $ep('meta[property="article:published_time"]').attr('content') || 
+                           $ep('meta[property="og:updated_time"]').attr('content') || ''
+ 
       // 1. Extract parent anime slug
       let parentAnimeSlug = ''
       $ep('a[href*="/anime/"]').each((_, el) => {
@@ -720,14 +726,18 @@ export default defineEventHandler(async (event) => {
       success: true,
       episodeSlug,
       videoSources: uniqueVideos,
-      anime: parentAnime
+      anime: parentAnime,
+      episodeViews,
+      episodeReleaseDate
     }
   } catch (error: any) {
     return {
       success: false,
       message: `Failed to resolve episode streams: ${error.message}`,
       videoSources: [],
-      anime: null
+      anime: null,
+      episodeViews: 0,
+      episodeReleaseDate: ''
     }
   }
 })
