@@ -98,6 +98,29 @@ let controlsTimeoutId = null
 let lastSavedSecond = 0
 let hasSeekedInitial = false
 
+const showLeftRipple = ref(false)
+const showRightRipple = ref(false)
+let rippleTimeoutLeft = null
+let rippleTimeoutRight = null
+let clickTimeoutId = null
+let lastClickTime = 0
+
+function showDoubleTapAnimation(side) {
+  if (side === 'left') {
+    showLeftRipple.value = true
+    if (rippleTimeoutLeft) clearTimeout(rippleTimeoutLeft)
+    rippleTimeoutLeft = setTimeout(() => {
+      showLeftRipple.value = false
+    }, 650)
+  } else {
+    showRightRipple.value = true
+    if (rippleTimeoutRight) clearTimeout(rippleTimeoutRight)
+    rippleTimeoutRight = setTimeout(() => {
+      showRightRipple.value = false
+    }, 650)
+  }
+}
+
 const episodeViews = ref(0)
 const episodeReleaseDate = ref(null)
 const isMobileDevice = ref(false)
@@ -777,7 +800,11 @@ function handleDurationChange(e) { duration.value = e.target.duration }
 function handleWaiting() { isBuffering.value = true }
 function handlePlaying() { isBuffering.value = false; isPlaying.value = true }
 function handlePlay() { isPlaying.value = true }
-function handlePause() { isPlaying.value = false; saveCurrentProgress() }
+function handlePause() {
+  isPlaying.value = false
+  showControls.value = true
+  saveCurrentProgress()
+}
 
 function handleEnded() {
   saveCurrentProgress()
@@ -869,16 +896,49 @@ function handleVideoClick(e) {
 
   if (isInteractive) return
 
-  if (isMobileDevice.value) {
-    showControls.value = !showControls.value
-    if (controlsTimeoutId) clearTimeout(controlsTimeoutId)
-    if (showControls.value && isPlaying.value) {
-      controlsTimeoutId = setTimeout(() => {
-        if (isPlaying.value && !isBuffering.value) showControls.value = false
-      }, 3000)
+  const rect = document.getElementById('video-container')?.getBoundingClientRect()
+  if (!rect) return
+
+  const clickX = (e.clientX - rect.left) / rect.width
+  const now = Date.now()
+  const delay = 280
+
+  if (now - lastClickTime < delay) {
+    if (clickTimeoutId) {
+      clearTimeout(clickTimeoutId)
+      clickTimeoutId = null
     }
+
+    if (clickX < 0.35) {
+      console.info('[Player] Double click left: seek -10s')
+      seekRelative(-10)
+      showDoubleTapAnimation('left')
+    } else if (clickX > 0.65) {
+      console.info('[Player] Double click right: seek +10s')
+      seekRelative(10)
+      showDoubleTapAnimation('right')
+    } else {
+      // Double click in center: toggle play/pause directly
+      togglePlay()
+    }
+    lastClickTime = 0
   } else {
-    togglePlay()
+    lastClickTime = now
+    clickTimeoutId = setTimeout(() => {
+      clickTimeoutId = null
+
+      if (isMobileDevice.value) {
+        showControls.value = !showControls.value
+        if (controlsTimeoutId) clearTimeout(controlsTimeoutId)
+        if (showControls.value && isPlaying.value) {
+          controlsTimeoutId = setTimeout(() => {
+            if (isPlaying.value && !isBuffering.value) showControls.value = false
+          }, 3000)
+        }
+      } else {
+        togglePlay()
+      }
+    }, delay)
   }
 }
 
@@ -1020,6 +1080,34 @@ function cleanTitle(t) {
           @ended="handleEnded"
         />
 
+        <!-- Double Tap Left Overlay (YouTube style) -->
+        <div
+          v-if="showLeftRipple"
+          class="absolute inset-y-0 left-0 w-1/3 bg-white/10 z-20 flex flex-col items-center justify-center pointer-events-none rounded-l-2xl animate-ripple-fade"
+        >
+          <div class="p-3.5 rounded-full bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center gap-1 shadow-lg">
+            <div class="flex gap-0.5">
+              <svg class="w-5 h-5 fill-white animate-pulse" viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+              <svg class="w-5 h-5 fill-white animate-pulse" style="animation-delay: 150ms;" viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+            </div>
+            <span class="text-[9px] font-extrabold text-white uppercase tracking-wider">-10s</span>
+          </div>
+        </div>
+
+        <!-- Double Tap Right Overlay (YouTube style) -->
+        <div
+          v-if="showRightRipple"
+          class="absolute inset-y-0 right-0 w-1/3 bg-white/10 z-20 flex flex-col items-center justify-center pointer-events-none rounded-r-2xl animate-ripple-fade"
+        >
+          <div class="p-3.5 rounded-full bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center gap-1 shadow-lg">
+            <div class="flex gap-0.5">
+              <svg class="w-5 h-5 fill-white animate-pulse" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+              <svg class="w-5 h-5 fill-white animate-pulse" style="animation-delay: 150ms;" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+            </div>
+            <span class="text-[9px] font-extrabold text-white uppercase tracking-wider">+10s</span>
+          </div>
+        </div>
+
         <!-- Buffering spinner -->
         <div v-if="isBuffering && !isResolving" class="absolute inset-0 flex items-center justify-center bg-black/30 z-10 pointer-events-none">
           <div class="w-12 h-12 rounded-full border-2 border-white/20 border-t-white animate-spin"></div>
@@ -1029,7 +1117,7 @@ function cleanTitle(t) {
         <div
           v-if="selectedVideo && !selectedVideo.isIframe"
           class="absolute top-4 left-4 sm:top-5 sm:left-6 z-10 transition-opacity duration-300 pointer-events-none"
-          :class="(showControls || !isPlaying) && selectedVideo ? 'opacity-100' : 'opacity-0'"
+          :class="showControls ? 'opacity-100' : 'opacity-0'"
         >
           <h2 v-if="parentAnime" class="text-sm sm:text-lg font-extrabold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] truncate max-w-[200px] sm:max-w-md">
             {{ parentAnime.title.replace('Nonton Anime ', '').replace('Sub Indo', '').trim() }}
@@ -1043,7 +1131,7 @@ function cleanTitle(t) {
         <div
           v-if="!isBuffering && !isResolving && selectedVideo && !selectedVideo.isIframe"
           class="absolute inset-0 flex items-center justify-center gap-3 sm:gap-7 z-10 transition-opacity duration-300"
-          :class="(showControls || !isPlaying) ? 'opacity-100' : 'opacity-0 pointer-events-none'"
+          :class="showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'"
         >
           <!-- 1. Previous Episode -->
           <NuxtLink
@@ -1122,7 +1210,7 @@ function cleanTitle(t) {
         <div
           v-if="selectedVideo && !selectedVideo.isIframe"
           class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent px-3 sm:px-5 pb-3 sm:pb-4 pt-14 flex flex-col gap-2 transition-opacity duration-300 z-10"
-          :class="(showControls || !isPlaying) && selectedVideo ? 'opacity-100' : 'opacity-0 pointer-events-none'"
+          :class="showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'"
         >
           <!-- Red Progress bar -->
           <input
@@ -1297,3 +1385,23 @@ function cleanTitle(t) {
 
   </div>
 </template>
+
+<style scoped>
+@keyframes ripple-fade {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.15);
+  }
+}
+.animate-ripple-fade {
+  animation: ripple-fade 0.65s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+</style>
