@@ -1011,7 +1011,6 @@ function cleanTitle(t) {
           playsinline
           referrerpolicy="no-referrer"
           class="w-full h-full object-contain"
-          @click="handleVideoClick"
           @timeupdate="handleTimeUpdate"
           @durationchange="handleDurationChange"
           @waiting="handleWaiting"
@@ -1045,7 +1044,8 @@ function cleanTitle(t) {
           v-if="!isBuffering && !isResolving && selectedVideo && !selectedVideo.isIframe"
           class="absolute inset-0 flex items-center justify-center gap-3 sm:gap-7 z-10 transition-opacity duration-300"
           :class="(showControls || !isPlaying) ? 'opacity-100' : 'opacity-0 pointer-events-none'"
-                   <!-- 1. Previous Episode -->
+        >
+          <!-- 1. Previous Episode -->
           <NuxtLink
             v-if="prevEpisode"
             :to="`/episode/${prevEpisode.slug}`"
