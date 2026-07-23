@@ -106,6 +106,43 @@ let clickTimeoutId = null
 let lastClickTime = 0
 let wasHolding = false
 
+const isMobileDevice = ref(false)
+
+const videoNaturalWidth = ref(0)
+const videoNaturalHeight = ref(0)
+
+const containerWidth = ref(0)
+const containerHeight = ref(0)
+
+const controlsInset = computed(() => {
+  if (!videoNaturalWidth.value || !videoNaturalHeight.value) return { top: '0px', bottom: '0px', left: '0px', right: '0px' }
+  const cw = containerWidth.value || 0
+  const ch = containerHeight.value || 0
+  if (!cw || !ch) return { top: '0px', bottom: '0px', left: '0px', right: '0px' }
+  const videoAR = videoNaturalWidth.value / videoNaturalHeight.value
+  const containerAR = cw / ch
+  if (Math.abs(videoAR - containerAR) < 0.05) return { top: '0px', bottom: '0px', left: '0px', right: '0px' }
+  if (videoAR < containerAR) {
+    // Pillarbox: black bars left & right
+    const renderedW = ch * videoAR
+    const barW = (cw - renderedW) / 2
+    return { left: `${barW}px`, right: `${barW}px`, top: '0px', bottom: '0px' }
+  } else {
+    // Letterbox: black bars top & bottom
+    const renderedH = cw / videoAR
+    const barH = (ch - renderedH) / 2
+    return { top: `${barH}px`, bottom: `${barH}px`, left: '0px', right: '0px' }
+  }
+})
+
+function updateContainerSize() {
+  const container = document.getElementById('video-container')
+  if (container) {
+    containerWidth.value = container.clientWidth
+    containerHeight.value = container.clientHeight
+  }
+}
+
 function showDoubleTapAnimation(side) {
   if (side === 'left') {
     showLeftRipple.value = true
@@ -124,7 +161,6 @@ function showDoubleTapAnimation(side) {
 
 const episodeViews = ref(0)
 const episodeReleaseDate = ref(null)
-const isMobileDevice = ref(false)
 
 const currentEpisodeViews = computed(() => {
   if (episodeViews.value > 0) return episodeViews.value
@@ -230,11 +266,20 @@ function getHostPriority(label) {
   return 99
 }
 
+let containerResizeObserver = null
+
 onMounted(async () => {
   isMobileDevice.value = window.matchMedia('(max-width: 768px)').matches || ('ontouchstart' in window)
   window.addEventListener('keydown', handleKeyDown)
   document.addEventListener('fullscreenchange', handleFullscreenChange)
   await loadEpisodeData()
+  await nextTick()
+  updateContainerSize()
+  const container = document.getElementById('video-container')
+  if (container && typeof ResizeObserver !== 'undefined') {
+    containerResizeObserver = new ResizeObserver(() => updateContainerSize())
+    containerResizeObserver.observe(container)
+  }
 })
 
 onBeforeUnmount(() => {
@@ -242,6 +287,10 @@ onBeforeUnmount(() => {
   destroyHls()
   window.removeEventListener('keydown', handleKeyDown)
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  if (containerResizeObserver) {
+    containerResizeObserver.disconnect()
+    containerResizeObserver = null
+  }
   if (typeof window !== 'undefined') {
     window.vnimeFullscreenExit = null
   }
@@ -1092,6 +1141,7 @@ function cleanTitle(t) {
           @play="handlePlay"
           @pause="handlePause"
           @ended="handleEnded"
+          @loadedmetadata="e => { videoNaturalWidth.value = e.target.videoWidth; videoNaturalHeight.value = e.target.videoHeight; updateContainerSize() }"
         />
 
         <!-- Double Tap Left Overlay (YouTube style) -->
@@ -1144,7 +1194,8 @@ function cleanTitle(t) {
         <!-- ===== CENTER CONTROLS OVERLAY ===== -->
         <div
           v-if="!isBuffering && !isResolving && selectedVideo && !selectedVideo.isIframe"
-          class="absolute inset-0 flex items-center justify-center gap-3 sm:gap-7 z-10 transition-opacity duration-300"
+          class="absolute flex items-center justify-center gap-3 sm:gap-7 z-10 transition-opacity duration-300"
+          :style="controlsInset"
           :class="showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'"
         >
           <!-- 1. Previous Episode -->
@@ -1223,7 +1274,8 @@ function cleanTitle(t) {
         <!-- ===== BOTTOM CONTROL BAR ===== -->
         <div
           v-if="selectedVideo && !selectedVideo.isIframe"
-          class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent px-3 sm:px-5 pb-3 sm:pb-4 pt-14 flex flex-col gap-2 transition-opacity duration-300 z-10"
+          class="absolute bottom-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent px-3 sm:px-5 pb-3 sm:pb-4 pt-14 flex flex-col gap-2 transition-opacity duration-300 z-10"
+          :style="{ left: controlsInset.left || '0px', right: controlsInset.right || '0px', bottom: controlsInset.bottom || '0px' }"
           :class="showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'"
         >
           <!-- Red Progress bar -->
