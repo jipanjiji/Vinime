@@ -104,6 +104,7 @@ let rippleTimeoutLeft = null
 let rippleTimeoutRight = null
 let clickTimeoutId = null
 let lastClickTime = 0
+let wasHolding = false
 
 function showDoubleTapAnimation(side) {
   if (side === 'left') {
@@ -764,6 +765,8 @@ function saveCurrentProgress() {
 
 // Player controls
 function handleMouseMove() {
+  if (isMobileDevice.value) return
+  if (isHolding2x.value) return
   showControls.value = true
   if (controlsTimeoutId) clearTimeout(controlsTimeoutId)
   controlsTimeoutId = setTimeout(() => {
@@ -844,12 +847,16 @@ let previousSpeedRate = 1.0
 function startHoldSpeed(e) {
   if (e && e.button && e.button !== 0) return
   if (holdTimer) clearTimeout(holdTimer)
+  wasHolding = false
   holdTimer = setTimeout(() => {
     const v = document.getElementById('vnime-player')
     if (v && !v.paused) {
       previousSpeedRate = v.playbackRate || 1.0
       v.playbackRate = 2.0
       isHolding2x.value = true
+      wasHolding = true
+      showControls.value = false
+      if (controlsTimeoutId) clearTimeout(controlsTimeoutId)
     }
   }, 220)
 }
@@ -865,6 +872,9 @@ function stopHoldSpeed() {
       v.playbackRate = playbackSpeed.value || previousSpeedRate || 1.0
     }
     isHolding2x.value = false
+    setTimeout(() => {
+      wasHolding = false
+    }, 50)
   }
 }
 
@@ -880,6 +890,10 @@ function toggleSpeed() {
 
 function handleVideoClick(e) {
   if (selectedVideo.value?.isIframe) return
+  if (wasHolding) {
+    wasHolding = false
+    return
+  }
 
   const path = e.composedPath ? e.composedPath() : []
   const isInteractive = path.some(el => {
